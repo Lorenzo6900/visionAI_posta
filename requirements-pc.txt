@@ -1,0 +1,8 @@
+# PC / Colab: entrenar, exportar el modelo y correr las herramientas
+ultralytics
+torch
+torchvision
+opencv-python
+numpy
+onnx
+onnxruntime

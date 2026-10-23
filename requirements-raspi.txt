@@ -1,0 +1,8 @@
+# Raspberry Pi 3 con Raspberry Pi OS Lite de 64 bits (dpkg --print-architecture = arm64). Sin torch.
+opencv-python-headless
+numpy
+onnxruntime
+# Cliente de voz (backend de Tincho por HTTP). Tincho agrega acá lo de audio.
+requests
+# picamera2 se instala con apt, no con pip:
+#   sudo apt install python3-picamera2

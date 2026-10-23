@@ -1,0 +1,13 @@
+{
+  "name": "visionai-ejemplo",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "node --env-file=.env comu.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "cors": "^2.8.6",
+    "pg": "^8.23.0"
+  }
+}

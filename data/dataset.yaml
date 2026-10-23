@@ -1,0 +1,6 @@
+﻿path: C:/VisionAI/dataset_real/final
+train: images/train
+val: images/val
+
+names:
+  0: cartel

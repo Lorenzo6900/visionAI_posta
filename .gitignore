@@ -1,0 +1,31 @@
+# Entornos virtuales
+venv/
+.venv/
+__pycache__/
+*.pyc
+
+# Dataset e imágenes (no se suben: viven en C:\VisionAI o Roboflow)
+dataset/
+dataset_real/
+final/
+capturas/
+recortes/
+galeria/
+*.jpg
+*.jpeg
+*.png
+*.mp4
+*.zip
+*.cache
+
+# Backend de voz (Node): dependencias y credenciales
+node_modules/
+.env
+*.m4a
+
+# Pesos grandes: solo se sube models/best.pt
+*.pt
+*.onnx
+*.param
+*.bin
+!models/best.pt

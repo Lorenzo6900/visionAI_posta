@@ -1,0 +1,884 @@
+{
+  "nodos": [
+    {
+      "id": 1,
+      "numero": "18",
+      "nombre": "Lab_5",
+      "x": -1.2,
+      "y": -0.55,
+      "pared": "sur",
+      "es_destino": true
+    },
+    {
+      "id": 2,
+      "numero": "8",
+      "nombre": "aula_200",
+      "x": 0.0,
+      "y": 1.41,
+      "pared": "oeste",
+      "es_destino": true
+    },
+    {
+      "id": 3,
+      "numero": "7",
+      "nombre": "oficina_lab5",
+      "x": 0.0,
+      "y": 3.51,
+      "pared": "este",
+      "es_destino": true
+    },
+    {
+      "id": 4,
+      "numero": "10",
+      "nombre": "escaleras_1",
+      "x": 0.0,
+      "y": 4.71,
+      "pared": "este",
+      "es_destino": true
+    },
+    {
+      "id": 5,
+      "numero": "9",
+      "nombre": "ascensor",
+      "x": 0.0,
+      "y": 5.61,
+      "pared": "oeste",
+      "es_destino": true
+    },
+    {
+      "id": 6,
+      "numero": "11",
+      "nombre": "aula_201",
+      "x": 0.0,
+      "y": 14.06,
+      "pared": "este",
+      "es_destino": true
+    },
+    {
+      "id": 7,
+      "numero": "11",
+      "nombre": "aula_202",
+      "x": 0.0,
+      "y": 14.06,
+      "pared": "oeste",
+      "es_destino": true
+    },
+    {
+      "id": 8,
+      "numero": "12",
+      "nombre": "aula_203",
+      "x": 0.0,
+      "y": 16.76,
+      "pared": "este",
+      "es_destino": true
+    },
+    {
+      "id": 9,
+      "numero": "12",
+      "nombre": "aula_204",
+      "x": 0.0,
+      "y": 16.76,
+      "pared": "oeste",
+      "es_destino": true
+    },
+    {
+      "id": 10,
+      "numero": "13",
+      "nombre": "aula_205",
+      "x": 0.0,
+      "y": 30.26,
+      "pared": "este",
+      "es_destino": true
+    },
+    {
+      "id": 11,
+      "numero": "13",
+      "nombre": "aula_206",
+      "x": 0.0,
+      "y": 30.26,
+      "pared": "oeste",
+      "es_destino": true
+    },
+    {
+      "id": 12,
+      "numero": "14",
+      "nombre": "aula_207",
+      "x": 0.0,
+      "y": 32.66,
+      "pared": "este",
+      "es_destino": true
+    },
+    {
+      "id": 13,
+      "numero": "14",
+      "nombre": "aula_208",
+      "x": 0.0,
+      "y": 32.66,
+      "pared": "oeste",
+      "es_destino": true
+    },
+    {
+      "id": 14,
+      "numero": "15",
+      "nombre": "oficina_2d0_lib",
+      "x": 0.0,
+      "y": 35.1,
+      "pared": "este",
+      "es_destino": true
+    },
+    {
+      "id": 15,
+      "numero": "15",
+      "nombre": "fede",
+      "x": 0.0,
+      "y": 35.1,
+      "pared": "oeste",
+      "es_destino": true
+    },
+    {
+      "id": 16,
+      "numero": "16",
+      "nombre": "lab_4",
+      "x": -4.85,
+      "y": 36.15,
+      "pared": "oeste",
+      "es_destino": true
+    },
+    {
+      "id": 17,
+      "numero": "17",
+      "nombre": "lab_2",
+      "x": -2.1,
+      "y": 38.85,
+      "pared": "norte",
+      "es_destino": true
+    },
+    {
+      "id": 18,
+      "numero": "31",
+      "nombre": "lab_3",
+      "x": -3.9,
+      "y": 43.95,
+      "pared": "oeste",
+      "es_destino": true
+    },
+    {
+      "id": 19,
+      "numero": "19",
+      "nombre": "lab_1",
+      "x": 12.0,
+      "y": 37.05,
+      "pared": "norte",
+      "es_destino": true
+    },
+    {
+      "id": 20,
+      "numero": "19",
+      "nombre": "sala_de_prof",
+      "x": 12.0,
+      "y": 37.05,
+      "pared": "sur",
+      "es_destino": true
+    },
+    {
+      "id": 21,
+      "numero": "20",
+      "nombre": "aula_213",
+      "x": 19.88,
+      "y": 37.05,
+      "pared": "norte",
+      "es_destino": true
+    },
+    {
+      "id": 22,
+      "numero": "20",
+      "nombre": "escaleras_medio",
+      "x": 19.88,
+      "y": 37.05,
+      "pared": "sur",
+      "es_destino": true
+    },
+    {
+      "id": 23,
+      "numero": "22",
+      "nombre": "baño",
+      "x": 23.18,
+      "y": 37.05,
+      "pared": "norte",
+      "es_destino": true
+    },
+    {
+      "id": 24,
+      "numero": "23",
+      "nombre": "materiales",
+      "x": 24.08,
+      "y": 37.05,
+      "pared": "sur",
+      "es_destino": true
+    },
+    {
+      "id": 25,
+      "numero": "24",
+      "nombre": "oficina_nico",
+      "x": 27.08,
+      "y": 37.05,
+      "pared": "sur",
+      "es_destino": true
+    },
+    {
+      "id": 26,
+      "numero": "25",
+      "nombre": "oficina_dario",
+      "x": 32.08,
+      "y": 37.05,
+      "pared": "sur",
+      "es_destino": true
+    },
+    {
+      "id": 27,
+      "numero": "32",
+      "nombre": "asistencia_2do",
+      "x": 31.48,
+      "y": 40.53,
+      "pared": "norte",
+      "es_destino": true
+    },
+    {
+      "id": 28,
+      "numero": "26",
+      "nombre": "aula_215",
+      "x": 38.68,
+      "y": 37.05,
+      "pared": "norte",
+      "es_destino": true
+    },
+    {
+      "id": 29,
+      "numero": "26",
+      "nombre": "aula_214",
+      "x": 38.68,
+      "y": 37.05,
+      "pared": "sur",
+      "es_destino": true
+    },
+    {
+      "id": 30,
+      "numero": "28",
+      "nombre": "aula_217",
+      "x": 41.68,
+      "y": 37.05,
+      "pared": "norte",
+      "es_destino": true
+    },
+    {
+      "id": 31,
+      "numero": "28",
+      "nombre": "aula_216",
+      "x": 41.68,
+      "y": 37.05,
+      "pared": "sur",
+      "es_destino": true
+    },
+    {
+      "id": 32,
+      "numero": "3",
+      "nombre": "final_escaleras",
+      "x": 46.18,
+      "y": 37.05,
+      "pared": "este",
+      "es_destino": true
+    },
+    {
+      "id": 33,
+      "numero": "2",
+      "nombre": "T",
+      "x": 0.0,
+      "y": 37.05,
+      "pared": "todas",
+      "es_destino": false
+    },
+    {
+      "id": 34,
+      "numero": "6",
+      "nombre": "descanso_medio",
+      "x": 31.48,
+      "y": 37.05,
+      "pared": "norte",
+      "es_destino": false
+    },
+    {
+      "id": 35,
+      "numero": "4",
+      "nombre": "intermedio_lab4",
+      "x": -2.4,
+      "y": 37.05,
+      "pared": "oeste",
+      "es_destino": false
+    }
+  ],
+  "aristas": [
+    {
+      "origen": 1,
+      "destino": 2,
+      "distancia": 2.3
+    },
+    {
+      "origen": 2,
+      "destino": 3,
+      "distancia": 2.1
+    },
+    {
+      "origen": 3,
+      "destino": 4,
+      "distancia": 1.2
+    },
+    {
+      "origen": 4,
+      "destino": 5,
+      "distancia": 0.9
+    },
+    {
+      "origen": 5,
+      "destino": 6,
+      "distancia": 8.45
+    },
+    {
+      "origen": 5,
+      "destino": 7,
+      "distancia": 8.45
+    },
+    {
+      "origen": 6,
+      "destino": 8,
+      "distancia": 2.7
+    },
+    {
+      "origen": 6,
+      "destino": 9,
+      "distancia": 2.7
+    },
+    {
+      "origen": 7,
+      "destino": 8,
+      "distancia": 2.7
+    },
+    {
+      "origen": 7,
+      "destino": 9,
+      "distancia": 2.7
+    },
+    {
+      "origen": 8,
+      "destino": 10,
+      "distancia": 13.5
+    },
+    {
+      "origen": 8,
+      "destino": 11,
+      "distancia": 13.5
+    },
+    {
+      "origen": 9,
+      "destino": 10,
+      "distancia": 13.5
+    },
+    {
+      "origen": 9,
+      "destino": 11,
+      "distancia": 13.5
+    },
+    {
+      "origen": 10,
+      "destino": 12,
+      "distancia": 2.4
+    },
+    {
+      "origen": 10,
+      "destino": 13,
+      "distancia": 2.4
+    },
+    {
+      "origen": 11,
+      "destino": 12,
+      "distancia": 2.4
+    },
+    {
+      "origen": 11,
+      "destino": 13,
+      "distancia": 2.4
+    },
+    {
+      "origen": 12,
+      "destino": 14,
+      "distancia": 2.44
+    },
+    {
+      "origen": 12,
+      "destino": 15,
+      "distancia": 2.44
+    },
+    {
+      "origen": 13,
+      "destino": 14,
+      "distancia": 2.44
+    },
+    {
+      "origen": 13,
+      "destino": 15,
+      "distancia": 2.44
+    },
+    {
+      "origen": 14,
+      "destino": 33,
+      "distancia": 1.95
+    },
+    {
+      "origen": 15,
+      "destino": 33,
+      "distancia": 1.95
+    },
+    {
+      "origen": 33,
+      "destino": 17,
+      "distancia": 2.77
+    },
+    {
+      "origen": 33,
+      "destino": 35,
+      "distancia": 2.4
+    },
+    {
+      "origen": 35,
+      "destino": 16,
+      "distancia": 2.61
+    },
+    {
+      "origen": 35,
+      "destino": 18,
+      "distancia": 7.06
+    },
+    {
+      "origen": 33,
+      "destino": 20,
+      "distancia": 12.0
+    },
+    {
+      "origen": 20,
+      "destino": 21,
+      "distancia": 7.88
+    },
+    {
+      "origen": 20,
+      "destino": 22,
+      "distancia": 7.88
+    },
+    {
+      "origen": 21,
+      "destino": 23,
+      "distancia": 3.3
+    },
+    {
+      "origen": 22,
+      "destino": 23,
+      "distancia": 3.3
+    },
+    {
+      "origen": 23,
+      "destino": 24,
+      "distancia": 0.9
+    },
+    {
+      "origen": 24,
+      "destino": 25,
+      "distancia": 3.0
+    },
+    {
+      "origen": 25,
+      "destino": 34,
+      "distancia": 4.4
+    },
+    {
+      "origen": 34,
+      "destino": 26,
+      "distancia": 0.6
+    },
+    {
+      "origen": 34,
+      "destino": 27,
+      "distancia": 3.48
+    },
+    {
+      "origen": 26,
+      "destino": 28,
+      "distancia": 6.6
+    },
+    {
+      "origen": 28,
+      "destino": 30,
+      "distancia": 3.0
+    },
+    {
+      "origen": 28,
+      "destino": 31,
+      "distancia": 3.0
+    },
+    {
+      "origen": 30,
+      "destino": 32,
+      "distancia": 4.5
+    },
+    {
+      "origen": 31,
+      "destino": 32,
+      "distancia": 4.5
+    },
+    {
+      "origen": 33,
+      "destino": 19,
+      "distancia": 12.0
+    },
+    {
+      "origen": 19,
+      "destino": 21,
+      "distancia": 7.88
+    },
+    {
+      "origen": 19,
+      "destino": 22,
+      "distancia": 7.88
+    },
+    {
+      "origen": 26,
+      "destino": 29,
+      "distancia": 6.6
+    },
+    {
+      "origen": 29,
+      "destino": 30,
+      "distancia": 3.0
+    },
+    {
+      "origen": 29,
+      "destino": 31,
+      "distancia": 3.0
+    }
+  ],
+  "carteles": [
+    {
+      "nombre": "impacto_social",
+      "codigo": "M01",
+      "ancho_m": 0.8,
+      "alto_m": 0.95,
+      "grados": 0.0,
+      "pared": "oeste",
+      "x": -2.4,
+      "y": 14.85,
+      "nodos": [
+        6,
+        7
+      ],
+      "marcador_ids": [
+        1,
+        2
+      ]
+    },
+    {
+      "nombre": "dispo_moviles",
+      "codigo": "M02",
+      "ancho_m": 0.293,
+      "alto_m": 0.415,
+      "grados": 180.0,
+      "pared": "este",
+      "x": 1.2,
+      "y": 7.05,
+      "nodos": [
+        5
+      ],
+      "marcador_ids": [
+        3
+      ]
+    },
+    {
+      "nombre": "tecno_satelital",
+      "codigo": "M03",
+      "ancho_m": 0.8,
+      "alto_m": 0.95,
+      "grados": 180.0,
+      "pared": "este",
+      "x": 2.4,
+      "y": 30.75,
+      "nodos": [
+        10,
+        11
+      ],
+      "marcador_ids": [
+        4,
+        5
+      ]
+    },
+    {
+      "nombre": "int_de_las_cosas",
+      "codigo": "M04",
+      "ancho_m": 0.8,
+      "alto_m": 0.95,
+      "grados": 90.0,
+      "pared": "sur",
+      "x": 34.18,
+      "y": 35.4,
+      "nodos": [
+        26
+      ],
+      "marcador_ids": [
+        6
+      ]
+    },
+    {
+      "nombre": "cartel_tic_vr",
+      "codigo": "M05",
+      "ancho_m": 2.17,
+      "alto_m": 1.19,
+      "grados": 90.0,
+      "pared": "sur",
+      "x": 5.1,
+      "y": 35.25,
+      "nodos": [
+        33
+      ],
+      "marcador_ids": [
+        7
+      ]
+    },
+    {
+      "nombre": "RV",
+      "codigo": "M06",
+      "ancho_m": 0.8,
+      "alto_m": 0.95,
+      "grados": 90.0,
+      "pared": "sur",
+      "x": 14.1,
+      "y": 35.25,
+      "nodos": [
+        20
+      ],
+      "marcador_ids": [
+        8
+      ]
+    },
+    {
+      "nombre": "impresion_3d",
+      "codigo": "M07",
+      "ancho_m": 0.8,
+      "alto_m": 0.95,
+      "grados": 90.0,
+      "pared": "sur",
+      "x": 16.2,
+      "y": 35.25,
+      "nodos": [
+        21,
+        22
+      ],
+      "marcador_ids": [
+        9,
+        10
+      ]
+    },
+    {
+      "nombre": "IA",
+      "codigo": "M08",
+      "ancho_m": 0.8,
+      "alto_m": 0.95,
+      "grados": 90.0,
+      "pared": "sur",
+      "x": 17.7,
+      "y": 35.25,
+      "nodos": [
+        21,
+        22
+      ],
+      "marcador_ids": [
+        11,
+        12
+      ]
+    },
+    {
+      "nombre": "arte_digital",
+      "codigo": "M09",
+      "ancho_m": 0.8,
+      "alto_m": 0.95,
+      "grados": 90.0,
+      "pared": "sur",
+      "x": 21.98,
+      "y": 35.25,
+      "nodos": [
+        23
+      ],
+      "marcador_ids": [
+        13
+      ]
+    },
+    {
+      "nombre": "videojuegos",
+      "codigo": "M10",
+      "ancho_m": 0.8,
+      "alto_m": 0.95,
+      "grados": 90.0,
+      "pared": "sur",
+      "x": 25.58,
+      "y": 35.25,
+      "nodos": [
+        24
+      ],
+      "marcador_ids": [
+        14
+      ]
+    },
+    {
+      "nombre": "hardware",
+      "codigo": "M11",
+      "ancho_m": 0.8,
+      "alto_m": 0.95,
+      "grados": 270.0,
+      "pared": "norte",
+      "x": 24.68,
+      "y": 38.85,
+      "nodos": [
+        24
+      ],
+      "marcador_ids": [
+        15
+      ]
+    },
+    {
+      "nombre": "apps",
+      "codigo": "M12",
+      "ancho_m": 0.8,
+      "alto_m": 0.95,
+      "grados": 270.0,
+      "pared": "norte",
+      "x": 26.78,
+      "y": 38.85,
+      "nodos": [
+        25
+      ],
+      "marcador_ids": [
+        16
+      ]
+    },
+    {
+      "nombre": "albert_einstein",
+      "codigo": "M13",
+      "ancho_m": 0.55,
+      "alto_m": 1.0,
+      "grados": 90.0,
+      "pared": "sur",
+      "x": 31.18,
+      "y": 35.93,
+      "nodos": [
+        34
+      ],
+      "marcador_ids": [
+        17
+      ]
+    },
+    {
+      "nombre": "frontal",
+      "codigo": "M14",
+      "ancho_m": 1.88,
+      "alto_m": 0.72,
+      "grados": 180.0,
+      "pared": "este",
+      "x": 32.38,
+      "y": 37.05,
+      "nodos": [
+        34
+      ],
+      "marcador_ids": [
+        18
+      ]
+    },
+    {
+      "nombre": "horarios_ort",
+      "codigo": "M15",
+      "ancho_m": 1.2,
+      "alto_m": 0.9,
+      "grados": 0.0,
+      "pared": "oeste",
+      "x": -3.6,
+      "y": 40.95,
+      "nodos": [
+        35
+      ],
+      "marcador_ids": [
+        19
+      ]
+    },
+    {
+      "nombre": "visionai_blanco",
+      "codigo": "M16",
+      "ancho_m": 0.3,
+      "alto_m": 0.45,
+      "grados": 270.0,
+      "pared": "norte",
+      "x": 37.98,
+      "y": 38.7,
+      "nodos": [
+        28,
+        29
+      ],
+      "marcador_ids": [
+        20,
+        21
+      ]
+    },
+    {
+      "nombre": "human_centric_data",
+      "codigo": "M17",
+      "ancho_m": 0.3,
+      "alto_m": 0.4,
+      "grados": 180.0,
+      "pared": "este",
+      "x": 1.8,
+      "y": 7.0,
+      "nodos": [
+        5
+      ],
+      "marcador_ids": [
+        22
+      ]
+    },
+    {
+      "nombre": "ai_neural_networks",
+      "codigo": "M18",
+      "ancho_m": 0.3,
+      "alto_m": 0.4,
+      "grados": 180.0,
+      "pared": "este",
+      "x": 2.1,
+      "y": 11.25,
+      "nodos": [
+        6,
+        7
+      ],
+      "marcador_ids": [
+        23,
+        24
+      ]
+    },
+    {
+      "nombre": "enfrente_a_horarios",
+      "codigo": "M19",
+      "ancho_m": 1.2,
+      "alto_m": 0.9,
+      "grados": 180.0,
+      "pared": "este",
+      "x": -1.6,
+      "y": 40.95,
+      "nodos": [
+        35
+      ],
+      "marcador_ids": [
+        25
+      ]
+    }
+  ]
+}
