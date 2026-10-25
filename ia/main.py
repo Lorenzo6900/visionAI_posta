@@ -2,7 +2,7 @@
 Pipeline de VisionAI en la raspi (~1 fps):
     cámara -> detectar -> identificar -> posicion -> ruta -> decidir -> voz
 
-ruta() y decidir() ya son reales. capturar, detectar, identificar y posicion todavía
+detectar(), ruta() y decidir() ya son reales. capturar, identificar y posicion todavía
 devuelven datos falsos; su lógica está en ia/herramientas/ y se va conectando de a una pieza.
 
 Uso (desde la raíz del repo):  python -m ia.main
@@ -15,15 +15,19 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import numpy as np
+from ultralytics import YOLO as ModeloYOLO
 
 from ia.herramientas.ruteo import buscar_ruta_optima
 from voz.cliente import hablar
 
 RAIZ = Path(__file__).resolve().parent.parent
 RUTA_GRAFO = RAIZ / "data" / "grafo.json"
+RUTA_YOLO = RAIZ / "models" / "best.pt"
 
-CONFIANZA_MINIMA = 0.6
-REPETIR_CADA_S = 5.0
+UMBRAL_DETECCION = 0.5   # confianza mínima de YOLO para aceptar un cartel
+UMBRAL_NMS = 0.45        # cajas que se pisan más que esto se consideran el mismo cartel
+CONFIANZA_MINIMA = 0.6   # de si hay o no confianza de que se sabe donde esta la persona.
+REPETIR_CADA_S = 5.0     #esto para no repetir la misma instruccion x cada frame.
 LLEGADA_M = 1.0          # a menos de esto de un nodo, se considera que ya llegó
 
 # Ángulos: este=0, norte=90, oeste=180, sur=270 (x crece al este, y al norte).
@@ -73,6 +77,7 @@ def cargar_grafo(ruta: Path = RUTA_GRAFO) -> dict:
 
 
 GRAFO = cargar_grafo()
+YOLO = ModeloYOLO(RUTA_YOLO)
 
 
 # ---------- Piezas del pipeline ----------
@@ -83,9 +88,15 @@ def capturar() -> np.ndarray:
 
 
 def detectar(frame: np.ndarray) -> list[Deteccion]:
-    # TODO: YOLO11n exportado a ONNX (models/) + refinar esquinas
-    esquinas = np.array([[600, 300], [680, 300], [680, 390], [600, 390]], dtype=np.float64)
-    return [Deteccion(caja=(600, 300, 680, 390), esquinas=esquinas, confianza=0.9)]
+    resultado = YOLO(frame, conf=UMBRAL_DETECCION, iou=UMBRAL_NMS, verbose=False)[0]
+
+    detecciones = []
+    for caja, confianza in zip(resultado.boxes.xyxy.tolist(), resultado.boxes.conf.tolist()):
+        x1, y1, x2, y2 = (int(v) for v in caja)
+        # TODO (Ivan): esquinas reales del cartel. Por ahora, las de la caja.
+        esquinas = np.array([[x1, y1], [x2, y1], [x2, y2], [x1, y2]], dtype=np.float64)
+        detecciones.append(Deteccion(caja=(x1, y1, x2, y2), esquinas=esquinas, confianza=confianza))
+    return detecciones
 
 
 def identificar(recorte: np.ndarray) -> tuple[str | None, float]:

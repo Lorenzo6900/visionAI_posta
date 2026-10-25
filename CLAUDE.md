@@ -15,6 +15,7 @@ Sistema de navegación en interiores para personas con discapacidad visual. Una 
 
 ## Estructura
 - `ia/main.py`: el pipeline. Hoy tiene una función por pieza con datos falsos.
+- `detectar()`: por ahora corre YOLO con ultralytics y `models/best.pt` (lo de ONNX todavía no se decidió con el equipo). Las esquinas son las de la caja hasta que Ivan pase su código.
 - `ia/herramientas/`: demos de clase y scripts de PC (calibración, recortes, comparación de embeddings, solvePnP, Dijkstra, filtrado de imágenes borrosas). Son la referencia para completar cada función de `main.py`.
 - `voz/cliente.py`: stub del cliente HTTP de voz que corre en la raspi. Lo completa Tincho.
 - `voz/backend/`: servidor Node de Tincho. Hace STT (`transcripcion.js`) y convierte lo que dijo la persona en un destino (`GET /destinos/buscar`, `busquedaService.js`). Las credenciales van en `voz/backend/.env` (ver `.env.example`). Arranca con `npm start`. La ruta NO se calcula acá: la calcula la raspi.

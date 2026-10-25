@@ -3,7 +3,7 @@
     {
       "id": 1,
       "numero": "18",
-      "nombre": "Lab_5",
+      "nombre": "Lab 5",
       "x": -1.2,
       "y": -0.55,
       "pared": "sur",
@@ -12,7 +12,7 @@
     {
       "id": 2,
       "numero": "8",
-      "nombre": "aula_200",
+      "nombre": "aula 200",
       "x": 0.0,
       "y": 1.41,
       "pared": "oeste",
@@ -21,7 +21,7 @@
     {
       "id": 3,
       "numero": "7",
-      "nombre": "oficina_lab5",
+      "nombre": "oficina lab5",
       "x": 0.0,
       "y": 3.51,
       "pared": "este",
@@ -30,7 +30,7 @@
     {
       "id": 4,
       "numero": "10",
-      "nombre": "escaleras_1",
+      "nombre": "escaleras 1",
       "x": 0.0,
       "y": 4.71,
       "pared": "este",
@@ -48,7 +48,7 @@
     {
       "id": 6,
       "numero": "11",
-      "nombre": "aula_201",
+      "nombre": "aula 201",
       "x": 0.0,
       "y": 14.06,
       "pared": "este",
@@ -57,7 +57,7 @@
     {
       "id": 7,
       "numero": "11",
-      "nombre": "aula_202",
+      "nombre": "aula 202",
       "x": 0.0,
       "y": 14.06,
       "pared": "oeste",
@@ -66,7 +66,7 @@
     {
       "id": 8,
       "numero": "12",
-      "nombre": "aula_203",
+      "nombre": "aula 203",
       "x": 0.0,
       "y": 16.76,
       "pared": "este",
@@ -75,7 +75,7 @@
     {
       "id": 9,
       "numero": "12",
-      "nombre": "aula_204",
+      "nombre": "aula 204",
       "x": 0.0,
       "y": 16.76,
       "pared": "oeste",
@@ -84,7 +84,7 @@
     {
       "id": 10,
       "numero": "13",
-      "nombre": "aula_205",
+      "nombre": "aula 205",
       "x": 0.0,
       "y": 30.26,
       "pared": "este",
@@ -93,7 +93,7 @@
     {
       "id": 11,
       "numero": "13",
-      "nombre": "aula_206",
+      "nombre": "aula 206",
       "x": 0.0,
       "y": 30.26,
       "pared": "oeste",
@@ -102,7 +102,7 @@
     {
       "id": 12,
       "numero": "14",
-      "nombre": "aula_207",
+      "nombre": "aula 207",
       "x": 0.0,
       "y": 32.66,
       "pared": "este",
@@ -111,7 +111,7 @@
     {
       "id": 13,
       "numero": "14",
-      "nombre": "aula_208",
+      "nombre": "aula 208",
       "x": 0.0,
       "y": 32.66,
       "pared": "oeste",
@@ -120,7 +120,7 @@
     {
       "id": 14,
       "numero": "15",
-      "nombre": "oficina_2d0_lib",
+      "nombre": "oficina 2d0 lib",
       "x": 0.0,
       "y": 35.1,
       "pared": "este",
@@ -138,7 +138,7 @@
     {
       "id": 16,
       "numero": "16",
-      "nombre": "lab_4",
+      "nombre": "lab 4",
       "x": -4.85,
       "y": 36.15,
       "pared": "oeste",
@@ -147,7 +147,7 @@
     {
       "id": 17,
       "numero": "17",
-      "nombre": "lab_2",
+      "nombre": "lab 2",
       "x": -2.1,
       "y": 38.85,
       "pared": "norte",
@@ -156,7 +156,7 @@
     {
       "id": 18,
       "numero": "31",
-      "nombre": "lab_3",
+      "nombre": "lab 3",
       "x": -3.9,
       "y": 43.95,
       "pared": "oeste",
@@ -165,7 +165,7 @@
     {
       "id": 19,
       "numero": "19",
-      "nombre": "lab_1",
+      "nombre": "lab 1",
       "x": 12.0,
       "y": 37.05,
       "pared": "norte",
@@ -174,7 +174,7 @@
     {
       "id": 20,
       "numero": "19",
-      "nombre": "sala_de_prof",
+      "nombre": "sala de profesores",
       "x": 12.0,
       "y": 37.05,
       "pared": "sur",
@@ -183,7 +183,7 @@
     {
       "id": 21,
       "numero": "20",
-      "nombre": "aula_213",
+      "nombre": "aula 213",
       "x": 19.88,
       "y": 37.05,
       "pared": "norte",
@@ -192,7 +192,7 @@
     {
       "id": 22,
       "numero": "20",
-      "nombre": "escaleras_medio",
+      "nombre": "escaleras medio",
       "x": 19.88,
       "y": 37.05,
       "pared": "sur",
@@ -219,7 +219,7 @@
     {
       "id": 25,
       "numero": "24",
-      "nombre": "oficina_nico",
+      "nombre": "oficina nico",
       "x": 27.08,
       "y": 37.05,
       "pared": "sur",
@@ -228,7 +228,7 @@
     {
       "id": 26,
       "numero": "25",
-      "nombre": "oficina_dario",
+      "nombre": "oficina dario",
       "x": 32.08,
       "y": 37.05,
       "pared": "sur",
@@ -237,7 +237,7 @@
     {
       "id": 27,
       "numero": "32",
-      "nombre": "asistencia_2do",
+      "nombre": "asistencia 2do",
       "x": 31.48,
       "y": 40.53,
       "pared": "norte",
@@ -246,7 +246,7 @@
     {
       "id": 28,
       "numero": "26",
-      "nombre": "aula_215",
+      "nombre": "aulas 215",
       "x": 38.68,
       "y": 37.05,
       "pared": "norte",
@@ -255,7 +255,7 @@
     {
       "id": 29,
       "numero": "26",
-      "nombre": "aula_214",
+      "nombre": "aula 214",
       "x": 38.68,
       "y": 37.05,
       "pared": "sur",
@@ -264,7 +264,7 @@
     {
       "id": 30,
       "numero": "28",
-      "nombre": "aula_217",
+      "nombre": "aula 217",
       "x": 41.68,
       "y": 37.05,
       "pared": "norte",
@@ -273,7 +273,7 @@
     {
       "id": 31,
       "numero": "28",
-      "nombre": "aula_216",
+      "nombre": "aula 216",
       "x": 41.68,
       "y": 37.05,
       "pared": "sur",
@@ -282,7 +282,7 @@
     {
       "id": 32,
       "numero": "3",
-      "nombre": "final_escaleras",
+      "nombre": "final escaleras",
       "x": 46.18,
       "y": 37.05,
       "pared": "este",
@@ -300,7 +300,7 @@
     {
       "id": 34,
       "numero": "6",
-      "nombre": "descanso_medio",
+      "nombre": "descanso medio",
       "x": 31.48,
       "y": 37.05,
       "pared": "norte",
@@ -309,7 +309,7 @@
     {
       "id": 35,
       "numero": "4",
-      "nombre": "intermedio_lab4",
+      "nombre": "intermedio lab4",
       "x": -2.4,
       "y": 37.05,
       "pared": "oeste",
