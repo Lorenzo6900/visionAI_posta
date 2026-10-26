@@ -2,7 +2,7 @@
 Pipeline de VisionAI en la raspi (~1 fps):
     cámara -> detectar -> identificar -> posicion -> ruta -> decidir -> voz
 
-detectar(), ruta() y decidir() ya son reales. capturar, identificar y posicion todavía
+detectar(), posicion(), ruta() y decidir() ya son reales. capturar e identificar todavía
 devuelven datos falsos; su lógica está en ia/herramientas/ y se va conectando de a una pieza.
 
 Uso (desde la raíz del repo):  python -m ia.main
@@ -14,6 +14,7 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import cv2
 import numpy as np
 from ultralytics import YOLO as ModeloYOLO
 
@@ -29,6 +30,14 @@ UMBRAL_NMS = 0.45        # cajas que se pisan más que esto se consideran el mis
 CONFIANZA_MINIMA = 0.6   # de si hay o no confianza de que se sabe donde esta la persona.
 REPETIR_CADA_S = 5.0     #esto para no repetir la misma instruccion x cada frame.
 LLEGADA_M = 1.0          # a menos de esto de un nodo, se considera que ya llegó
+ERROR_MAXIMO_PX = 3.0    # error de reproyección de solvePnP; más que esto = posición poco confiable
+
+# Cámara: K nominal a 1280x720, la misma que herramientas/solvePNP.py, hasta que Ivan recalibre.
+# (data/calibracion.npz no sirve: está hecho a otra resolución y tiene k3 ≈ −48.)
+K_CAMARA = np.array([[1060, 0, 640],
+                     [0, 1060, 360],
+                     [0,    0,   1]], dtype=np.float64)
+DISTORSION = np.zeros(5)
 
 # Ángulos: este=0, norte=90, oeste=180, sur=270 (x crece al este, y al norte).
 # Positivo = antihorario, o sea que girar a la izquierda suma grados.
@@ -106,15 +115,48 @@ def identificar(recorte: np.ndarray) -> tuple[str | None, float]:
     return "impacto_social", 0.8
 
 
-def posicion(esquinas: np.ndarray, cartel: dict) -> Posicion:
-    # TODO: solvePnP con ancho_m, alto_m, x, y y grados del cartel (ver herramientas/solvePNP.py)
-    # Por ahora: parado a 2 m justo enfrente del cartel, mirándolo.
+def posicion(esquinas: np.ndarray, cartel: dict) -> tuple[Posicion | None, float]:
+    """Dónde está la persona en el mapa, a partir de las 4 esquinas del cartel en la foto.
+    Devuelve (posición, confianza). La confianza es 0 si solvePnP no cierra bien (error de
+    reproyección grande) o da algo imposible (la cámara detrás del cartel)."""
+    ancho, alto = cartel["ancho_m"], cartel["alto_m"]
+
+    # Esquinas en el cartel, desde su centro (mismo orden que las esquinas de la foto).
+    # Ejes del cartel: X a la derecha (mirándolo de frente), Y para abajo, Z hacia adentro de la pared.
+    puntos_pared = np.array([
+        [-ancho / 2, -alto / 2, 0],   # arriba-izq
+        [ ancho / 2, -alto / 2, 0],   # arriba-der
+        [ ancho / 2,  alto / 2, 0],   # abajo-der
+        [-ancho / 2,  alto / 2, 0],   # abajo-izq
+    ], dtype=np.float64)
+
+    ok, rvec, tvec = cv2.solvePnP(puntos_pared, esquinas.astype(np.float64), K_CAMARA, DISTORSION,
+                                  flags=cv2.SOLVEPNP_IPPE)   # IPPE: método para objetos planos
+    if not ok:
+        return None, 0.0
+
+    reproyectados, _ = cv2.projectPoints(puntos_pared, rvec, tvec, K_CAMARA, DISTORSION)
+    error = np.linalg.norm(reproyectados.reshape(4, 2) - esquinas, axis=1).mean()
+
+    R, _ = cv2.Rodrigues(rvec)
+    cx, _, cz = (-R.T @ tvec).ravel()       # cámara vista desde el cartel (cz < 0 = está enfrente)
+    ax, _, az = R[2]                        # hacia dónde apunta la cámara, en ejes del cartel
+    if cz >= 0:
+        return None, 0.0
+
+    # Del cartel al mapa: "enfrente" (−Z) es hacia donde mira el cartel (grados);
+    # su "derecha" (X) está 90° a la izquierda de eso, visto desde arriba.
     frente = math.radians(cartel["grados"])
-    return Posicion(
-        x=cartel["x"] + 2.0 * math.cos(frente),
-        y=cartel["y"] + 2.0 * math.sin(frente),
-        rumbo_grados=(cartel["grados"] + 180) % 360,
-    )
+    derecha = frente + math.pi / 2
+    def al_mapa(a_la_derecha, hacia_adelante):
+        return (a_la_derecha * math.cos(derecha) + hacia_adelante * math.cos(frente),
+                a_la_derecha * math.sin(derecha) + hacia_adelante * math.sin(frente))
+
+    dx, dy = al_mapa(cx, -cz)
+    rx, ry = al_mapa(ax, -az)
+    pos = Posicion(x=cartel["x"] + dx, y=cartel["y"] + dy,
+                   rumbo_grados=math.degrees(math.atan2(ry, rx)) % 360)
+    return pos, (1.0 if error <= ERROR_MAXIMO_PX else 0.0)
 
 
 def ruta(nodo: int, destino: int) -> list[int]:
@@ -212,9 +254,9 @@ def procesar_frame(frame: np.ndarray, destino: int, estado: Estado) -> str | Non
 
     cartel = GRAFO["carteles"][nombre]
     nodo = cartel["nodos"][0]      # si el cartel está en dos nodos gemelos, están en el mismo punto
-    pos = posicion(mejor.esquinas, cartel)
+    pos, confianza_pos = posicion(mejor.esquinas, cartel)
     estado.camino = ruta(nodo, destino)
-    return decidir(estado.camino, pos, min(mejor.confianza, confianza), estado)
+    return decidir(estado.camino, pos, min(mejor.confianza, confianza, confianza_pos), estado)
 
 
 def main(destino: int = 12, cantidad_frames: int = 3) -> None:
