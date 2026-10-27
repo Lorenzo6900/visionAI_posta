@@ -1,40 +1,116 @@
 # VisionAI
 
-Sistema de navegación en interiores para personas con discapacidad visual. Una Raspberry Pi 3 (1 GB de RAM), con cámara y auriculares con micrófono, detecta carteles en el piso, calcula dónde está la persona y la guía por audio hasta un aula.
+Sistema de navegación en interiores para personas con discapacidad visual. Una Raspberry Pi 3 (1 GB de RAM), con cámara, auriculares con micrófono y un botón, saca fotos del pasillo. Un servidor reconoce los carteles, calcula dónde está la persona y la guía por audio hasta un aula.
 
-## Arquitectura
-- Todo corre en la raspi, excepto la voz (STT y TTS), que la hace el backend de Tincho por HTTP (`voz/`).
-- Pipeline por frame (~1 fps), en `ia/main.py`:
-  YOLO11n (1 clase: `cartel`) -> esquinas -> embedding (qué cartel es) -> nodo -> solvePnP (posición) -> Dijkstra (ruta) -> motor de decisiones -> texto -> voz.
-- El grafo vive en `data/grafo.json` y se lee al arrancar. En la raspi no hay base de datos. La fuente es la base Neon de Tincho (tablas `nodos`, `aristas` y `marcadores`): se exporta a `data/*.csv` y se regenera con `python ia/herramientas/generar_grafo.py`.
-- Ids: se usan los ids de Neon (1 a 35). El N viejo de la planilla "tablas nodos" queda en `numero`. Los nodos van de a pares gemelos (uno por lado del pasillo, en el mismo punto), por ejemplo aula_201 y aula_202.
-- Flujo de un cartel: YOLO lo detecta -> los embeddings dicen cuál es (su nombre, por ejemplo `impacto_social`; las carpetas de la galería se llaman por su código M01..M19) -> en `grafo.json` se busca su x, y, tamaño, orientación y nodo -> solvePnP da la posición de la persona -> Dijkstra -> instrucción.
-- `grados` de un cartel = hacia dónde mira su frente, con este=0, norte=90, oeste=180, sur=270 (x crece al este, y al norte). Es lo opuesto a su `pared`.
-- Motor de decisiones: habla si la instrucción cambió; si no cambió, repite como máximo cada 5 s; si la confianza es baja, dice que no está seguro.
-- En la raspi **no se instala PyTorch**: los modelos (YOLO y el de embeddings) se exportan a ONNX y se corren con onnxruntime. Hace falta Raspberry Pi OS Lite de 64 bits: `dpkg --print-architecture` tiene que dar `arm64` (`armhf` = 32 bits, onnxruntime no se instala). No usar `uname -m`, que puede dar `aarch64` con sistema de 32 bits.
+## Arquitectura (acordada el 2026-10-27)
+```
+raspi  ──frame / audio──▶  Node (Tincho)  ──frame / texto──▶  IA, FastAPI (ia/)
+raspi  ◀──────audio──────  Node: STT y TTS ◀──────texto───────  IA
+```
+- **La IA no corre en la raspi**: corre en un servidor de ORT, junto con Node, en la misma máquina. Por eso en la raspi no hace falta PyTorch ni ONNX.
+- **La raspi nunca le habla directo a la IA.** Node es la puerta de entrada, porque pasa el texto a audio antes de devolverlo.
+- **Hay una sola raspi y un solo usuario a la vez.** La IA guarda un único estado global en memoria (destino, última instrucción, último cartel visto). No hay sesión ni autenticación.
+- **Las indicaciones las arma la IA con el grafo**, no un chat de IA: el chat no conoce el mapa ni dónde está la persona.
+
+### Contrato de la API
+**Raspi → Node**
+- `POST /frame`: `multipart/form-data`, campo `imagen` (JPEG, 1280x720). Responde con audio, o `204 No Content` si no hay nada que decir.
+- `POST /audio`: el audio grabado mientras se apretaba el botón (wav o webm, lo decide Tincho). Responde con el audio de la frase de confirmación.
+
+**Node → IA** (FastAPI en `http://localhost:8000`)
+- `POST /frame`: el mismo JPEG, `multipart/form-data`, campo `imagen`. Devuelve:
+  ```json
+  {"texto": "Girá a la derecha y avanzá 3 metros.", "debug": {"nodo": 10, "x": 0.4, "y": 29.8, "rumbo": 92, "confianza": 1.0}}
+  ```
+  `"texto": null` si conviene callar. `debug` es para probar la posición sin escuchar el audio; Node lo ignora.
+- `POST /destino`: `{"texto": "quiero ir al baño"}` (lo que transcribió Node). Devuelve:
+  ```json
+  {"frase": "Voy a llevarte a baño", "destino_id": 23}
+  ```
+  Si no entiende: `{"frase": "No te entendí. ¿A dónde querés ir?", "destino_id": null}`. Node pasa `frase` al TTS.
+- Todo responde `200` con JSON. Si la IA falla o tarda, Node lo trata como `texto: null` y no corta el flujo.
+
+### Pipeline de cada frame (`ia/main.py`)
+`detectar()` (YOLO11n + esquinas de Ivan) -> `enderezar()` -> `identificar()` (vector + galería) -> cartel en `grafo.json` -> `posicion()` (solvePnP) -> `ruta()` (Dijkstra) -> `decidir()` -> texto.
+- Solo se usan los carteles con esquinas reales (`esquinas_refinadas`). Sin ellas no se puede enderezar el recorte ni usar solvePnP.
+- **Elección del cartel del frame** (cuando hay varios, por ejemplo en la pared sur): descartar los cortados por el borde de la foto y los que `identificar()` no reconoce, y de los que quedan usar el más grande (el más cercano, con el que solvePnP es más preciso). Hoy todavía se identifica uno solo, el de mayor confianza de YOLO: si ese no se reconoce, el frame se pierde aunque haya otro cartel reconocible.
+- `identificar()` responde solo si el cartel más parecido de la galería se parece al menos `PARECIDO_MINIMO = 0.75` y le gana al segundo por al menos `MARGEN_MINIMO = 0.04`. Si no, "no sé" y se espera al frame siguiente. En fotos del día 3, contesta en ~6 de cada 10 recortes y acierta el 97%. Se da por terminado así.
+
+### Reglas del motor de decisiones (`decidir()`)
+- Habla si la instrucción cambió. Si no cambió, la repite como máximo cada 5 s.
+- Si la confianza es baja: "No estoy seguro de dónde estás. Mové la cabeza despacio."
+- **Sin destino todavía:** "Decime a dónde querés ir" (con la misma regla de los 5 s).
+- **Llegada:** dice "Llegaste a …" y borra el destino. Después se **calla** hasta que la persona vuelva a hablar (no pide destino).
+- **Destino nuevo:** un `/destino` nuevo reemplaza al anterior en cualquier momento, también a mitad de camino.
+- **Más de ~10 s sin ver un cartel** (identificado y con posición válida): "Mové la cabeza despacio".
+- Si no hay destino y tampoco ve carteles, gana "Decime a dónde querés ir".
+
+### Texto -> destino (`/destino`)
+Se porta `voz/backend/busquedaService.js` a Python. Se compara solo con el `nombre` (no con `numero`) y solo con los nodos `es_destino`. Si no está seguro, toma el mejor candidato y lo dice en voz alta ("Voy a llevarte a aula 203"). El nombre alcanza para diferenciar los gemelos (aula 201 y aula 202).
+
+## Mapa y convenciones
+- El grafo vive en `data/grafo.json` y se lee al arrancar. La fuente es la base Neon de Tincho (tablas `nodos`, `aristas` y `marcadores`): se exporta a `data/*.csv` y se regenera con `python ia/herramientas/generar_grafo.py`.
+- Ids: se usan los ids de Neon (1 a 35). El N viejo de la planilla "tablas nodos" queda en `numero`. Los nodos van de a pares gemelos (uno por lado del pasillo, en el mismo punto).
+- Los nombres de `grafo.json` se editaron a mano (sin guiones bajos). Si se corre `generar_grafo.py`, vuelven a tener guiones bajos. No rompe nada: `decidir()` y la búsqueda de destino los cambian por espacios.
+- Ángulos: este=0, norte=90, oeste=180, sur=270 (x crece al este, y al norte). Positivo = antihorario, o sea que girar a la izquierda suma grados.
+- `grados` de un cartel = hacia dónde mira su frente. Es lo opuesto a su `pared`.
+- Cada cartel tiene un código M01..M19 (hoja "carteles_ivan" de la planilla). Las carpetas de la galería se llaman así.
 
 ## Estructura
-- `ia/main.py`: el pipeline. Hoy tiene una función por pieza con datos falsos.
-- `detectar()`: por ahora corre YOLO con ultralytics y `models/best.pt` (lo de ONNX todavía no se decidió con el equipo). Las esquinas son las de la caja hasta que Ivan pase su código.
-- `ia/herramientas/`: demos de clase y scripts de PC (calibración, recortes, comparación de embeddings, solvePnP, Dijkstra, filtrado de imágenes borrosas). Son la referencia para completar cada función de `main.py`.
-- `voz/cliente.py`: stub del cliente HTTP de voz que corre en la raspi. Lo completa Tincho.
-- `voz/backend/`: servidor Node de Tincho. Hace STT (`transcripcion.js`) y convierte lo que dijo la persona en un destino (`GET /destinos/buscar`, `busquedaService.js`). Las credenciales van en `voz/backend/.env` (ver `.env.example`). Arranca con `npm start`. La ruta NO se calcula acá: la calcula la raspi.
-- `data/`: `grafo.json` (generado), las 3 tablas de Neon en CSV, `calibracion.npz`, `dataset.yaml`.
+- `ia/main.py`: el pipeline y el motor de decisiones. Hoy se corre con `python -m ia.main` y una imagen negra; con los endpoints, `capturar()` y `main()` se reemplazan por la app FastAPI.
+- `ia/embeddings.py`: `enderezar()` (recorte de 160x190) y `vector()` (MobileNetV2). Lo usan la galería y `identificar()`; los dos tienen que hacer exactamente lo mismo.
+- `ia/herramientas/`:
+  - Scripts de PC: `generar_grafo.py`, `generar_galeria.py` (recortar / vectores), `marcar_a_mano.py`, `probar_detectar.py`.
+  - Usados por `main.py`: `modelo_esquinas.py` (esquinas de Ivan) y `ruteo.py` (Dijkstra). Si se cambian, cambia el pipeline.
+  - Demos de clase: el resto.
+- `voz/backend/`: servidor Node de Tincho. Las credenciales van en `voz/backend/.env`, que no se sube.
+- `voz/cliente.py`: stub viejo. Con la arquitectura nueva, el cliente de la raspi lo hace Tincho.
+- `data/`: `grafo.json`, `galeria.npz` (158 vectores de los 19 carteles), las 3 tablas de Neon en CSV, `calibracion.npz`, `dataset.yaml`.
 - `models/best.pt`: YOLO11n entrenado (mAP50 ≈ 0.92 en val d1+d2). Es el único peso que se sube a git.
-- `docs/cvat/`: docker-compose de CVAT para etiquetar.
+- `docs/cvat/`: docker-compose de CVAT.
 
-## Cómo correr
-- PC: `pip install -r requirements-pc.txt`
-- Raspi: `pip install -r requirements-raspi.txt` (picamera2 se instala con apt)
-- Desde la raíz: `python -m ia.main`
+## Galería de embeddings
+Las fotos están en `C:\VisionAI\embeddings\galeria\M01..M19` (fuera del repo). Para regenerar `data/galeria.npz`, desde la raíz:
+1. `python -m ia.herramientas.generar_galeria recortar C:/VisionAI/embeddings/galeria`
+2. Revisar los recortes en `galeria_recortes/`: borrar los del cartel equivocado, agregar su foto a `a_mano.txt` y marcarlas con `python -m ia.herramientas.marcar_a_mano C:/VisionAI/embeddings/galeria` (clicks: arriba-izq, arriba-der, abajo-der, abajo-izq).
+3. `python -m ia.herramientas.generar_galeria vectores C:/VisionAI/embeddings/galeria`
+
+## Plan y reparto
+**Primero (desbloquean al resto)**
+1. Acordar entre los tres el contrato de la API (la propuesta está arriba).
+2. Ivan: calibración real, con la misma cámara y a 1280x720, en `data/calibracion.npz`.
+3. Subir `data/galeria.npz` al repo.
+
+**IA (Lorenzo e Ivan)**
+- Meter la calibración real en `main.py` (hoy usa la K nominal `K_CAMARA`) y verificar solvePnP con fotos tomadas desde posiciones conocidas. Es el control más importante: un solvePnP malo da instrucciones equivocadas.
+- Elegir el cartel del frame: descartar los cortados por el borde y los de baja similitud, y quedarse con el más grande.
+- Texto -> destino en Python.
+- Endpoints FastAPI `/frame` y `/destino`, con el estado en memoria.
+- Casos nuevos en `decidir()`: sin destino, llegada y más de 10 s sin cartel.
+
+**Backend (Tincho)**
+- `POST /audio` y `POST /frame` como en el contrato, sin el chat de IA ni `/destinos/buscar`.
+- TTS devuelto en la misma respuesta.
+- Dirección fija del servidor de ORT. Probar que la raspi lo alcanza desde el WiFi de la demo, y que el servidor tiene salida a internet (STT y TTS usan servicios externos).
+- Script que arranque juntos la IA (`uvicorn`) y Node (`npm start`).
+
+**Raspi (Tincho, con Ivan en cámara y botón)**
+- Cliente Python: manda frames con Picamera2 a 1280x720 desde que se enciende; graba mientras el botón está apretado y manda el audio; reproduce sin pisar un audio que todavía suena; arranca solo al encender (systemd).
+- Raspberry Pi OS Lite de 64 bits: `dpkg --print-architecture` tiene que dar `arm64`.
+
+**Integración**
+1. Probar la tubería completa con una IA falsa que devuelva siempre el mismo texto (valida raspi, backend, red y TTS).
+2. Conectar la IA real y probar en un tramo con carteles físicos.
+3. Medir el error de posición en metros (con `debug`), las instrucciones correctas y la latencia total. No hay objetivo de tiempo: lo importante es que ande.
 
 ## Pendientes conocidos
-- **Recalibrar la cámara.** `data/calibracion.npz` parece hecho a unos 640x480 (centro óptico en 351, 282) y tiene k3 ≈ −48, que es sospechoso. La cámara ahora captura a 1280x720. `herramientas/solvePNP.py` usa una K nominal hasta que se recalibre.
-- En Neon faltan 6 aristas de los gemelos lab_1 (19) y aula_214 (29). Mientras tanto las agrega `ARISTAS_FALTANTES` en `generar_grafo.py`; cuando estén en Neon, se vacía esa lista.
-- La galería de embeddings tiene 5 de los 19 carteles (M01, M03, M05, M06, M08).
-- Exportar `best.pt` y MobileNetV2 (embeddings) a ONNX.
-- Falta el TTS (lo hace Tincho).
+- `data/calibracion.npz` actual no sirve (hecho a ~640x480, k3 ≈ −48). `main.py` usa una K nominal hasta que llegue la de Ivan.
+- En Neon faltan 6 aristas de los gemelos lab_1 (19) y aula_214 (29). Mientras tanto las agrega `ARISTAS_FALTANTES` en `generar_grafo.py`.
+- El código de esquinas de Ivan encuentra las esquinas en ~45% de las detecciones (falla con carteles blancos o cortados por el borde).
+- La galería tiene pocas fotos de algunos carteles (M15 tiene 2) y pocas nítidas.
+- `requirements-raspi.txt` es de la arquitectura vieja (onnxruntime en la raspi); hay que revisarlo para el cliente nuevo.
 
 ## Reglas
 - No subir el dataset ni imágenes al repo. Los datos están en `C:\VisionAI` y en Roboflow.
+- Las credenciales (Neon, API key de ia-tic) van solo en `.env`, nunca en el código ni en `.env.example`.
 - Código y comentarios en español, con el estilo simple de los scripts existentes.

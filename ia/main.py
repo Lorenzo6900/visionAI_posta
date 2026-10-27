@@ -2,8 +2,8 @@
 Pipeline de VisionAI en la raspi (~1 fps):
     cámara -> detectar -> identificar -> posicion -> ruta -> decidir -> voz
 
-detectar(), posicion(), ruta() y decidir() ya son reales. capturar e identificar todavía
-devuelven datos falsos; su lógica está en ia/herramientas/ y se va conectando de a una pieza.
+detectar(), identificar(), posicion(), ruta() y decidir() ya son reales. capturar() todavía
+devuelve una imagen negra (falta Picamera2 en la raspi).
 
 Uso (desde la raíz del repo):  python -m ia.main
 """
@@ -18,6 +18,7 @@ import cv2
 import numpy as np
 from ultralytics import YOLO as ModeloYOLO
 
+from ia.embeddings import enderezar, vector
 from ia.herramientas.modelo_esquinas import esquinas_en_caja
 from ia.herramientas.ruteo import buscar_ruta_optima
 from voz.cliente import hablar
@@ -25,6 +26,7 @@ from voz.cliente import hablar
 RAIZ = Path(__file__).resolve().parent.parent
 RUTA_GRAFO = RAIZ / "data" / "grafo.json"
 RUTA_YOLO = RAIZ / "models" / "best.pt"
+RUTA_GALERIA = RAIZ / "data" / "galeria.npz"     # se arma con herramientas/generar_galeria.py
 
 UMBRAL_DETECCION = 0.5   # confianza mínima de YOLO para aceptar un cartel
 UMBRAL_NMS = 0.45        # cajas que se pisan más que esto se consideran el mismo cartel
@@ -33,6 +35,9 @@ REPETIR_CADA_S = 5.0     #esto para no repetir la misma instruccion x cada frame
 LLEGADA_M = 1.0          # a menos de esto de un nodo, se considera que ya llegó
 ERROR_MAXIMO_PX = 3.0    # error de reproyección de solvePnP; más que esto = posición poco confiable
 COCIENTE_AMBIGUO = 2.0   # si la 2da solución de solvePnP encaja casi tan bien como la 1ra (menos de 2 veces peor), no se sabe cuál es
+# identificar(): con estos dos, en las fotos del día 3 contesta en ~6 de cada 10 recortes y acierta el 97%
+PARECIDO_MINIMO = 0.75   # el cartel más parecido de la galería se tiene que parecer al menos esto (si no: no es un cartel)
+MARGEN_MINIMO = 0.04     # y le tiene que ganar al segundo cartel por al menos esto (si no: duda entre dos)
 
 # Cámara: K nominal a 1280x720, la misma que herramientas/solvePNP.py, hasta que Ivan recalibre.
 # (data/calibracion.npz no sirve: está hecho a otra resolución y tiene k3 ≈ −48.)
@@ -88,7 +93,17 @@ def cargar_grafo(ruta: Path = RUTA_GRAFO) -> dict:
     }
 
 
+def cargar_galeria(ruta: Path = RUTA_GALERIA) -> dict:
+    datos = np.load(ruta)
+    nombre_de = {c["codigo"]: c["nombre"] for c in GRAFO["carteles"].values()}
+    return {
+        "vectores": datos["vectores"],                            # un vector por recorte, de largo 1
+        "nombres": np.array([nombre_de[c] for c in datos["codigos"]]),  # M01 -> impacto_social
+    }
+
+
 GRAFO = cargar_grafo()
+GALERIA = cargar_galeria()
 YOLO = ModeloYOLO(RUTA_YOLO)
 
 
@@ -117,10 +132,22 @@ def detectar(frame: np.ndarray) -> list[Deteccion]:
 
 
 def identificar(recorte: np.ndarray) -> tuple[str | None, float]:
-    """Devuelve (nombre del cartel, confianza). El nombre es la clave de GRAFO["carteles"];
-    es None si no se reconoce el cartel."""
-    # TODO: embedding + galería (ver herramientas/compararEmbeddings.py)
-    return "impacto_social", 0.8
+    """Qué cartel es, comparando su vector con los de la galería.
+    recorte: el cartel ya enderezado con enderezar() (igual que en la galería).
+    Devuelve (nombre del cartel, confianza). El nombre es la clave de GRAFO["carteles"];
+    es None (confianza 0) si no se parece lo suficiente a ninguno o si duda entre dos."""
+    parecidos = GALERIA["vectores"] @ vector(recorte)     # largo 1: el producto es el parecido
+
+    # El parecido de cada cartel es el de su recorte más parecido
+    por_cartel = {}
+    for nombre, parecido in zip(GALERIA["nombres"], parecidos):
+        por_cartel[nombre] = max(por_cartel.get(nombre, -1.0), float(parecido))
+    ordenados = sorted(por_cartel.items(), key=lambda par: par[1], reverse=True)
+
+    (primero, parecido), (_, segundo) = ordenados[0], ordenados[1]
+    if parecido < PARECIDO_MINIMO or parecido - segundo < MARGEN_MINIMO:
+        return None, 0.0
+    return str(primero), 1.0
 
 
 def posicion(esquinas: np.ndarray, cartel: dict) -> tuple[Posicion | None, float]:
@@ -246,28 +273,23 @@ def decidir(camino: list[int], pos: Posicion, confianza: float, estado: Estado,
     return texto
 
 
-def recortar(frame: np.ndarray, caja: tuple[int, int, int, int]) -> np.ndarray:
-    x1, y1, x2, y2 = caja
-    return frame[y1:y2, x1:x2]
-
-
 # ---------- Bucle principal ----------
 
 def procesar_frame(frame: np.ndarray, destino: int, estado: Estado) -> str | None:
-    detecciones = detectar(frame)
+    # Sin las esquinas reales no se puede enderezar el recorte (identificar) ni usar solvePnP:
+    # esas detecciones se ignoran y se espera a la foto siguiente.
+    detecciones = [d for d in detectar(frame) if d.esquinas_refinadas]
     if not detecciones:
         return None
 
     mejor = max(detecciones, key=lambda d: d.confianza)
-    nombre, confianza = identificar(recortar(frame, mejor.caja))
+    nombre, confianza = identificar(enderezar(frame, mejor.esquinas))
     if nombre is None:
         return None
 
     cartel = GRAFO["carteles"][nombre]
     nodo = cartel["nodos"][0]      # si el cartel está en dos nodos gemelos, están en el mismo punto
     pos, confianza_pos = posicion(mejor.esquinas, cartel)
-    if not mejor.esquinas_refinadas:
-        confianza_pos = 0.0        # con las esquinas de la caja, solvePnP da cualquier cosa
     estado.camino = ruta(nodo, destino)
     return decidir(estado.camino, pos, min(mejor.confianza, confianza, confianza_pos), estado)
 
