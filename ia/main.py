@@ -18,6 +18,7 @@ import cv2
 import numpy as np
 from ultralytics import YOLO as ModeloYOLO
 
+from ia.herramientas.modelo_esquinas import esquinas_en_caja
 from ia.herramientas.ruteo import buscar_ruta_optima
 from voz.cliente import hablar
 
@@ -31,6 +32,7 @@ CONFIANZA_MINIMA = 0.6   # de si hay o no confianza de que se sabe donde esta la
 REPETIR_CADA_S = 5.0     #esto para no repetir la misma instruccion x cada frame.
 LLEGADA_M = 1.0          # a menos de esto de un nodo, se considera que ya llegó
 ERROR_MAXIMO_PX = 3.0    # error de reproyección de solvePnP; más que esto = posición poco confiable
+COCIENTE_AMBIGUO = 2.0   # si la 2da solución de solvePnP encaja casi tan bien como la 1ra (menos de 2 veces peor), no se sabe cuál es
 
 # Cámara: K nominal a 1280x720, la misma que herramientas/solvePNP.py, hasta que Ivan recalibre.
 # (data/calibracion.npz no sirve: está hecho a otra resolución y tiene k3 ≈ −48.)
@@ -51,6 +53,7 @@ class Deteccion:
     caja: tuple[int, int, int, int]     # x1, y1, x2, y2 en píxeles
     esquinas: np.ndarray                # 4x2: arriba-izq, arriba-der, abajo-der, abajo-izq
     confianza: float
+    esquinas_refinadas: bool            # True = esquinas reales del cartel; False = las de la caja
 
 
 @dataclass
@@ -102,9 +105,14 @@ def detectar(frame: np.ndarray) -> list[Deteccion]:
     detecciones = []
     for caja, confianza in zip(resultado.boxes.xyxy.tolist(), resultado.boxes.conf.tolist()):
         x1, y1, x2, y2 = (int(v) for v in caja)
-        # TODO (Ivan): esquinas reales del cartel. Por ahora, las de la caja.
-        esquinas = np.array([[x1, y1], [x2, y1], [x2, y2], [x1, y2]], dtype=np.float64)
-        detecciones.append(Deteccion(caja=(x1, y1, x2, y2), esquinas=esquinas, confianza=confianza))
+        # Esquinas reales con el código de Ivan (herramientas/modelo_esquinas.py).
+        # Si no las encuentra, quedan las de la caja, que no sirven para solvePnP.
+        esquinas = esquinas_en_caja(frame, (x1, y1, x2, y2))
+        refinadas = esquinas is not None
+        if not refinadas:
+            esquinas = np.array([[x1, y1], [x2, y1], [x2, y2], [x1, y2]], dtype=np.float64)
+        detecciones.append(Deteccion(caja=(x1, y1, x2, y2), esquinas=esquinas.astype(np.float64),
+                                     confianza=confianza, esquinas_refinadas=refinadas))
     return detecciones
 
 
@@ -118,7 +126,7 @@ def identificar(recorte: np.ndarray) -> tuple[str | None, float]:
 def posicion(esquinas: np.ndarray, cartel: dict) -> tuple[Posicion | None, float]:
     """Dónde está la persona en el mapa, a partir de las 4 esquinas del cartel en la foto.
     Devuelve (posición, confianza). La confianza es 0 si solvePnP no cierra bien (error de
-    reproyección grande) o da algo imposible (la cámara detrás del cartel)."""
+    reproyección grande), si es ambiguo (ver abajo) o si da algo imposible (la cámara detrás del cartel)."""
     ancho, alto = cartel["ancho_m"], cartel["alto_m"]
 
     # Esquinas en el cartel, desde su centro (mismo orden que las esquinas de la foto).
@@ -130,16 +138,19 @@ def posicion(esquinas: np.ndarray, cartel: dict) -> tuple[Posicion | None, float
         [-ancho / 2,  alto / 2, 0],   # abajo-izq
     ], dtype=np.float64)
 
-    ok, rvec, tvec = cv2.solvePnP(puntos_pared, esquinas.astype(np.float64), K_CAMARA, DISTORSION,
-                                  flags=cv2.SOLVEPNP_IPPE)   # IPPE: método para objetos planos
-    if not ok:
+    # Con un objeto plano, IPPE siempre da 2 soluciones "espejadas", ordenadas de la que mejor encaja a la peor.
+    # Si el cartel se ve chico o casi de frente, las dos encajan parecido y con un poco de ruido puede ganar
+    # la equivocada (en la simulación, errores de metros). En ese caso es mejor decir que no se sabe.
+    cantidad, rvecs, tvecs, errores = cv2.solvePnPGeneric(puntos_pared, esquinas.astype(np.float64), K_CAMARA,
+                                                          DISTORSION, flags=cv2.SOLVEPNP_IPPE)
+    if cantidad == 0:
         return None, 0.0
+    errores = np.array(errores).ravel()
+    error = errores[0]
+    ambiguo = cantidad > 1 and errores[1] < COCIENTE_AMBIGUO * error
 
-    reproyectados, _ = cv2.projectPoints(puntos_pared, rvec, tvec, K_CAMARA, DISTORSION)
-    error = np.linalg.norm(reproyectados.reshape(4, 2) - esquinas, axis=1).mean()
-
-    R, _ = cv2.Rodrigues(rvec)
-    cx, _, cz = (-R.T @ tvec).ravel()       # cámara vista desde el cartel (cz < 0 = está enfrente)
+    R, _ = cv2.Rodrigues(rvecs[0])
+    cx, _, cz = (-R.T @ tvecs[0]).ravel()       # cámara vista desde el cartel (cz < 0 = está enfrente)
     ax, _, az = R[2]                        # hacia dónde apunta la cámara, en ejes del cartel
     if cz >= 0:
         return None, 0.0
@@ -156,7 +167,7 @@ def posicion(esquinas: np.ndarray, cartel: dict) -> tuple[Posicion | None, float
     rx, ry = al_mapa(ax, -az)
     pos = Posicion(x=cartel["x"] + dx, y=cartel["y"] + dy,
                    rumbo_grados=math.degrees(math.atan2(ry, rx)) % 360)
-    return pos, (1.0 if error <= ERROR_MAXIMO_PX else 0.0)
+    return pos, (1.0 if error <= ERROR_MAXIMO_PX and not ambiguo else 0.0)
 
 
 def ruta(nodo: int, destino: int) -> list[int]:
@@ -255,6 +266,8 @@ def procesar_frame(frame: np.ndarray, destino: int, estado: Estado) -> str | Non
     cartel = GRAFO["carteles"][nombre]
     nodo = cartel["nodos"][0]      # si el cartel está en dos nodos gemelos, están en el mismo punto
     pos, confianza_pos = posicion(mejor.esquinas, cartel)
+    if not mejor.esquinas_refinadas:
+        confianza_pos = 0.0        # con las esquinas de la caja, solvePnP da cualquier cosa
     estado.camino = ruta(nodo, destino)
     return decidir(estado.camino, pos, min(mejor.confianza, confianza, confianza_pos), estado)
 

@@ -74,7 +74,7 @@ for ruta in imagenes:
         falsos += sum(not any(iou(d.caja, e) > 0.5 for e in etiquetas) for d in detecciones)
 
 print(f"{len(imagenes)} fotos, {total_detecciones} detecciones, {refinadas} con esquinas refinadas")
-# El primer frame es más lento (onnxruntime se calienta), por eso se saltea
+# El primer frame es más lento (el modelo se calienta), por eso se saltea
 print(f"Tiempo de detectar(): {np.mean(tiempos[1:] or tiempos) * 1000:.0f} ms promedio")
 if etiquetados:
     print(f"Carteles etiquetados: {etiquetados}, encontrados: {aciertos} ({aciertos / etiquetados:.0%}), "
