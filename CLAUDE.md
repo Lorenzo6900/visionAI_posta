@@ -33,20 +33,23 @@ raspi  ◀──────audio──────  Node: STT y TTS ◀──�
 ### Pipeline de cada frame (`ia/main.py`)
 `detectar()` (YOLO11n + esquinas de Ivan) -> `enderezar()` -> `identificar()` (vector + galería) -> cartel en `grafo.json` -> `posicion()` (solvePnP) -> `ruta()` (Dijkstra) -> `decidir()` -> texto.
 - Solo se usan los carteles con esquinas reales (`esquinas_refinadas`). Sin ellas no se puede enderezar el recorte ni usar solvePnP.
-- **Elección del cartel del frame** (cuando hay varios, por ejemplo en la pared sur): descartar los cortados por el borde de la foto y los que `identificar()` no reconoce, y de los que quedan usar el más grande (el más cercano, con el que solvePnP es más preciso). Hoy todavía se identifica uno solo, el de mayor confianza de YOLO: si ese no se reconoce, el frame se pierde aunque haya otro cartel reconocible.
+- **Elección del cartel del frame** (cuando hay varios, por ejemplo en la pared sur): se descartan los cortados por el borde de la foto (caja a menos de `MARGEN_BORDE_PX = 5` del borde: sus esquinas caen sobre el borde y solvePnP da cualquier cosa) y los que `identificar()` no reconoce. De los que quedan se usa el más grande (área de las esquinas): el más cercano, con el que solvePnP es más preciso.
 - `identificar()` responde solo si el cartel más parecido de la galería se parece al menos `PARECIDO_MINIMO = 0.75` y le gana al segundo por al menos `MARGEN_MINIMO = 0.04`. Si no, "no sé" y se espera al frame siguiente. En fotos del día 3, contesta en ~6 de cada 10 recortes y acierta el 97%. Se da por terminado así.
 
 ### Reglas del motor de decisiones (`decidir()`)
-- Habla si la instrucción cambió. Si no cambió, la repite como máximo cada 5 s.
-- Si la confianza es baja: "No estoy seguro de dónde estás. Mové la cabeza despacio."
-- **Sin destino todavía:** "Decime a dónde querés ir" (con la misma regla de los 5 s).
-- **Llegada:** dice "Llegaste a …" y borra el destino. Después se **calla** hasta que la persona vuelva a hablar (no pide destino).
-- **Destino nuevo:** un `/destino` nuevo reemplaza al anterior en cualquier momento, también a mitad de camino.
-- **Más de ~10 s sin ver un cartel** (identificado y con posición válida): "Mové la cabeza despacio".
-- Si no hay destino y tampoco ve carteles, gana "Decime a dónde querés ir".
+Todos los frames pasan por `decidir()`, también los que no tienen cartel. Gana el primer caso que se cumple:
+1. **Callado:** después de llegar no dice nada hasta que la persona vuelva a hablar. Cualquier `/destino` lo saca, aunque no se le entienda.
+2. **Sin destino:** "Decime a dónde querés ir." Gana aunque tampoco vea carteles.
+3. **Sin posición válida** (no vio un cartel identificado, o solvePnP dio poca confianza: cuentan igual): se calla, y si pasan más de `SIN_CARTEL_S = 10` s desde la última posición válida dice "Mové la cabeza despacio." El reloj arranca de nuevo cuando llega un destino.
+4. **Llegada:** "Llegaste a … La puerta está a tu …", borra el destino y pasa a callado.
+5. **Instrucción:** "Girá a la derecha y avanzá 3 metros", etc.
+
+- Habla si la instrucción cambió. Si no cambió, la repite como máximo cada 5 s (`REPETIR_CADA_S`).
+- **Destino nuevo:** un `/destino` nuevo reemplaza al anterior en cualquier momento, también a mitad de camino, y la próxima instrucción se dice enseguida.
+- Ya no existe "No estoy seguro de dónde estás": la poca confianza cae en el caso 3.
 
 ### Texto -> destino (`/destino`)
-Se porta `voz/backend/busquedaService.js` a Python. Se compara solo con el `nombre` (no con `numero`) y solo con los nodos `es_destino`. Si no está seguro, toma el mejor candidato y lo dice en voz alta ("Voy a llevarte a aula 203"). El nombre alcanza para diferenciar los gemelos (aula 201 y aula 202).
+En `ia/herramientas/destino.py` (`buscar_destino(texto, GRAFO["nodos"])`), portado de `voz/backend/busquedaService.js`. Se compara solo con el `nombre` (no con `numero`) y solo con los nodos `es_destino`. Siempre toma el mejor candidato y lo dice en voz alta ("Voy a llevarte a aula 203"); si ninguno pasa el puntaje mínimo, "No te entendí. ¿A dónde querés ir?". El nombre alcanza para diferenciar los gemelos (aula 201 y aula 202). No entiende "laboratorio" por "lab".
 
 ## Mapa y convenciones
 - El grafo vive en `data/grafo.json` y se lee al arrancar. La fuente es la base Neon de Tincho (tablas `nodos`, `aristas` y `marcadores`): se exporta a `data/*.csv` y se regenera con `python ia/herramientas/generar_grafo.py`.
@@ -57,11 +60,12 @@ Se porta `voz/backend/busquedaService.js` a Python. Se compara solo con el `nomb
 - Cada cartel tiene un código M01..M19 (hoja "carteles_ivan" de la planilla). Las carpetas de la galería se llaman así.
 
 ## Estructura
-- `ia/main.py`: el pipeline y el motor de decisiones. Hoy se corre con `python -m ia.main` y una imagen negra; con los endpoints, `capturar()` y `main()` se reemplazan por la app FastAPI.
+- `ia/main.py`: el pipeline y el motor de decisiones. No se corre solo: `procesar_frame(frame, estado)` devuelve `(texto, debug)` y lo llama el servidor.
+- `ia/servidor.py`: la app FastAPI con `POST /frame` y `POST /destino` y el único `Estado` en memoria. Se levanta desde la raíz con `uvicorn ia.servidor:app --host 127.0.0.1 --port 8000`; en `http://127.0.0.1:8000/docs` se prueban los endpoints a mano.
 - `ia/embeddings.py`: `enderezar()` (recorte de 160x190) y `vector()` (MobileNetV2). Lo usan la galería y `identificar()`; los dos tienen que hacer exactamente lo mismo.
 - `ia/herramientas/`:
   - Scripts de PC: `generar_grafo.py`, `generar_galeria.py` (recortar / vectores), `marcar_a_mano.py`, `probar_detectar.py`.
-  - Usados por `main.py`: `modelo_esquinas.py` (esquinas de Ivan) y `ruteo.py` (Dijkstra). Si se cambian, cambia el pipeline.
+  - Usados por `main.py`: `modelo_esquinas.py` (esquinas de Ivan) y `ruteo.py` (Dijkstra). Si se cambian, cambia el pipeline.`destino.py` (texto -> destino) lo usa `servidor.py`.
   - Demos de clase: el resto.
 - `voz/backend/`: servidor Node de Tincho. Las credenciales van en `voz/backend/.env`, que no se sube.
 - `voz/cliente.py`: stub viejo. Con la arquitectura nueva, el cliente de la raspi lo hace Tincho.
@@ -83,10 +87,7 @@ Las fotos están en `C:\VisionAI\embeddings\galeria\M01..M19` (fuera del repo). 
 
 **IA (Lorenzo e Ivan)**
 - Meter la calibración real en `main.py` (hoy usa la K nominal `K_CAMARA`) y verificar solvePnP con fotos tomadas desde posiciones conocidas. Es el control más importante: un solvePnP malo da instrucciones equivocadas.
-- Elegir el cartel del frame: descartar los cortados por el borde y los de baja similitud, y quedarse con el más grande.
-- Texto -> destino en Python.
-- Endpoints FastAPI `/frame` y `/destino`, con el estado en memoria.
-- Casos nuevos en `decidir()`: sin destino, llegada y más de 10 s sin cartel.
+- Hecho: elección del cartel del frame, texto -> destino, endpoints FastAPI y casos nuevos en `decidir()`.
 
 **Backend (Tincho)**
 - `POST /audio` y `POST /frame` como en el contrato, sin el chat de IA ni `/destinos/buscar`.
@@ -109,6 +110,7 @@ Las fotos están en `C:\VisionAI\embeddings\galeria\M01..M19` (fuera del repo). 
 - El código de esquinas de Ivan encuentra las esquinas en ~45% de las detecciones (falla con carteles blancos o cortados por el borde).
 - La galería tiene pocas fotos de algunos carteles (M15 tiene 2) y pocas nítidas.
 - `requirements-raspi.txt` es de la arquitectura vieja (onnxruntime en la raspi); hay que revisarlo para el cliente nuevo.
+- Si Node manda un pedido mal armado (sin el campo `imagen` o sin `texto`), FastAPI responde `422`, no `200`.
 
 ## Reglas
 - No subir el dataset ni imágenes al repo. Los datos están en `C:\VisionAI` y en Roboflow.

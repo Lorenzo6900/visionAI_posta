@@ -27,6 +27,7 @@ UMBRAL_DETECCION = 0.5   # confianza mínima de YOLO para aceptar un cartel
 UMBRAL_NMS = 0.45        # cajas que se pisan más que esto se consideran el mismo cartel
 CONFIANZA_MINIMA = 0.6   # de si hay o no confianza de que se sabe donde esta la persona.
 REPETIR_CADA_S = 5.0     #esto para no repetir la misma instruccion x cada frame.
+SIN_CARTEL_S = 10.0      # con destino y sin posición válida durante esto, pide mover la cabeza
 LLEGADA_M = 1.0          # a menos de esto de un nodo, se considera que ya llegó
 ERROR_MAXIMO_PX = 3.0    # error de reproyección de solvePnP; más que esto = posición poco confiable
 COCIENTE_AMBIGUO = 2.0   # si la 2da solución de solvePnP encaja casi tan bien como la 1ra (menos de 2 veces peor), no se sabe cuál es
@@ -70,6 +71,8 @@ class Estado:
     ultima_instruccion: tuple | None = None   # (acción, nodo objetivo) de lo último que se dijo
     ultima_vez: float = 0.0
     camino: list[int] = field(default_factory=list)
+    callado: bool = False                     # True después de llegar, hasta que la persona vuelva a hablar
+    ultimo_cartel: float = 0.0                # cuándo se vio por última vez un cartel con posición válida
 
 
 # ---------- Datos ----------
@@ -232,15 +235,28 @@ def lado_de_la_puerta(destino: dict, pos: Posicion) -> str:
     return " La puerta está a tu izquierda." if giro > 0 else " La puerta está a tu derecha."
 
 
-def decidir(camino: list[int], pos: Posicion, confianza: float, estado: Estado,
+def decidir(camino: list[int], pos: Posicion | None, confianza: float, estado: Estado,
             ahora: float | None = None) -> str | None:
     """Devuelve el texto a decir, o None si conviene quedarse callado.
+    pos es None si en este frame no se identificó ningún cartel.
     Habla si la instrucción cambió; si no cambió, la repite como máximo cada REPETIR_CADA_S."""
     ahora = time.monotonic() if ahora is None else ahora
 
-    if confianza < CONFIANZA_MINIMA:
-        instruccion = ("no_seguro", None)
-        texto = "No estoy seguro de dónde estás. Mové la cabeza despacio."
+    # Una posición con poca confianza cuenta igual que no haber visto un cartel
+    valida = pos is not None and confianza >= CONFIANZA_MINIMA
+    if valida:
+        estado.ultimo_cartel = ahora
+
+    if estado.callado:              # ya llegó: no dice nada hasta que la persona vuelva a hablar
+        return None
+    if estado.destino is None:      # gana aunque tampoco vea carteles
+        instruccion = ("sin_destino", None)
+        texto = "Decime a dónde querés ir."
+    elif not valida:
+        if ahora - estado.ultimo_cartel < SIN_CARTEL_S:
+            return None             # todavía no pasaron los 10 s: espera el próximo cartel
+        instruccion = ("sin_cartel", None)
+        texto = "Mové la cabeza despacio."
     elif not camino:
         instruccion = ("sin_camino", None)
         texto = "No encuentro un camino hasta el destino."
@@ -252,6 +268,8 @@ def decidir(camino: list[int], pos: Posicion, confianza: float, estado: Estado,
             destino = GRAFO["nodos"][camino[-1]]
             instruccion = ("llegada", destino["id"])
             texto = f"Llegaste a {destino['nombre'].replace('_', ' ')}." + lado_de_la_puerta(destino, pos)
+            estado.destino = None   # ya no hay a dónde ir
+            estado.callado = True
         else:
             objetivo = lejos[0]
             accion = accion_de_giro(diferencia(rumbo_hacia(pos, objetivo), pos.rumbo_grados))
@@ -292,7 +310,7 @@ def procesar_frame(frame: np.ndarray, estado: Estado) -> tuple[str | None, dict 
             mejor = deteccion
             break
     if mejor is None:
-        return None, None
+        return decidir([], None, 0.0, estado), None # # sin cartel igual se decide: puede tocar pedir destino o mover la cabeza.
 
     cartel = GRAFO["carteles"][nombre]
     nodo = cartel["nodos"][0]      # si el cartel está en dos nodos gemelos, están en el mismo punto
@@ -304,8 +322,6 @@ def procesar_frame(frame: np.ndarray, estado: Estado) -> tuple[str | None, dict 
              "rumbo": round(pos.rumbo_grados) if pos else None,
              "confianza": round(confianza_total, 2)}
 
-    if estado.destino is None:      # todavía no dijo a dónde va (los avisos se agregan en la tarea 10)
-        return None, debug
-    estado.camino = ruta(nodo, estado.destino)
+    estado.camino = ruta(nodo, estado.destino) if estado.destino is not None else []
     return decidir(estado.camino, pos, confianza_total, estado), debug
 

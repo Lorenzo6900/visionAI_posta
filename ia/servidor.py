@@ -11,6 +11,7 @@ import cv2
 import numpy as np
 from fastapi import FastAPI, File, UploadFile
 from pydantic import BaseModel
+import time
 
 from ia.herramientas.destino import buscar_destino
 from ia.main import GRAFO, Estado, procesar_frame
@@ -43,8 +44,10 @@ def recibir_frame(imagen: UploadFile = File(...)):
 @app.post("/destino")
 def recibir_destino(pedido: PedidoDestino):
     frase, destino_id = buscar_destino(pedido.texto, GRAFO["nodos"])
-    if destino_id is not None:     # si no entendió, sigue el destino que tenía
-        with CANDADO:
+    with CANDADO:
+        ESTADO.callado = False         # la persona volvió a hablar, aunque no se le haya entendido
+        if destino_id is not None:     # si no entendió, sigue el destino que tenía
             ESTADO.destino = destino_id
-            ESTADO.ultima_instruccion = None   # destino nuevo: en el próximo frame habla seguro
+            ESTADO.ultima_instruccion = None       # destino nuevo: en el próximo frame habla seguro
+            ESTADO.ultimo_cartel = time.monotonic()  # los 10 s sin cartel se cuentan desde acá
     return {"frase": frase, "destino_id": destino_id}
