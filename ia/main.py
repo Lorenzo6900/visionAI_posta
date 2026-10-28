@@ -1,13 +1,9 @@
 """
-Pipeline de VisionAI en la raspi (~1 fps):
-    cámara -> detectar -> identificar -> posicion -> ruta -> decidir -> voz
+Pipeline de VisionAI en el servidor (~1 fps):
+    frame (llega por POST /frame) -> detectar -> identificar -> posicion -> ruta -> decidir -> texto
 
-detectar(), identificar(), posicion(), ruta() y decidir() ya son reales. capturar() todavía
-devuelve una imagen negra (falta Picamera2 en la raspi).
-
-Uso (desde la raíz del repo):  python -m ia.main
+Los endpoints están en ia/servidor.py. Este archivo no se corre solo.
 """
-
 import json
 import math
 import time
@@ -21,7 +17,6 @@ from ultralytics import YOLO as ModeloYOLO
 from ia.embeddings import enderezar, vector
 from ia.herramientas.modelo_esquinas import esquinas_en_caja
 from ia.herramientas.ruteo import buscar_ruta_optima
-from voz.cliente import hablar
 
 RAIZ = Path(__file__).resolve().parent.parent
 RUTA_GRAFO = RAIZ / "data" / "grafo.json"
@@ -38,6 +33,7 @@ COCIENTE_AMBIGUO = 2.0   # si la 2da solución de solvePnP encaja casi tan bien 
 # identificar(): con estos dos, en las fotos del día 3 contesta en ~6 de cada 10 recortes y acierta el 97%
 PARECIDO_MINIMO = 0.75   # el cartel más parecido de la galería se tiene que parecer al menos esto (si no: no es un cartel)
 MARGEN_MINIMO = 0.04     # y le tiene que ganar al segundo cartel por al menos esto (si no: duda entre dos)
+MARGEN_BORDE_PX = 5      # una caja a menos de esto del borde de la foto se toma como cartel cortado
 
 # Cámara: K nominal a 1280x720, la misma que herramientas/solvePNP.py, hasta que Ivan recalibre.
 # (data/calibracion.npz no sirve: está hecho a otra resolución y tiene k3 ≈ −48.)
@@ -70,6 +66,7 @@ class Posicion:
 
 @dataclass
 class Estado:
+    destino: int | None = None                # id del nodo al que va la persona (lo fija POST /destino)
     ultima_instruccion: tuple | None = None   # (acción, nodo objetivo) de lo último que se dijo
     ultima_vez: float = 0.0
     camino: list[int] = field(default_factory=list)
@@ -108,10 +105,6 @@ YOLO = ModeloYOLO(RUTA_YOLO)
 
 
 # ---------- Piezas del pipeline ----------
-
-def capturar() -> np.ndarray:
-    # TODO: Picamera2 a 1280x720 (ver herramientas/calibracioncamara.py)
-    return np.zeros((720, 1280, 3), dtype=np.uint8)
 
 
 def detectar(frame: np.ndarray) -> list[Deteccion]:
@@ -275,36 +268,44 @@ def decidir(camino: list[int], pos: Posicion, confianza: float, estado: Estado,
 
 # ---------- Bucle principal ----------
 
-def procesar_frame(frame: np.ndarray, destino: int, estado: Estado) -> str | None:
-    # Sin las esquinas reales no se puede enderezar el recorte (identificar) ni usar solvePnP:
-    # esas detecciones se ignoran y se espera a la foto siguiente.
-    detecciones = [d for d in detectar(frame) if d.esquinas_refinadas]
-    if not detecciones:
-        return None
+def cortado_por_el_borde(deteccion: Deteccion, ancho: int, alto: int) -> bool:
+    x1, y1, x2, y2 = deteccion.caja
+    return (x1 < MARGEN_BORDE_PX or y1 < MARGEN_BORDE_PX
+            or x2 > ancho - MARGEN_BORDE_PX or y2 > alto - MARGEN_BORDE_PX)
 
-    mejor = max(detecciones, key=lambda d: d.confianza)
-    nombre, confianza = identificar(enderezar(frame, mejor.esquinas))
-    if nombre is None:
-        return None
+
+def procesar_frame(frame: np.ndarray, estado: Estado) -> tuple[str | None, dict | None]:
+    """Devuelve (texto a decir, debug). El texto es None si conviene callar; debug es None si no
+    se reconoció ningún cartel (si no, trae nodo, x, y, rumbo y confianza para probar la posición)."""
+    detecciones = [d for d in detectar(frame) if d.esquinas_refinadas]
+
+    # Elección del cartel: se descartan los cortados por el borde y los que identificar() no reconoce,
+    # y de los que quedan se usa el más grande (el más cercano: solvePnP es más preciso).
+    alto, ancho = frame.shape[:2]
+    detecciones = [d for d in detecciones if not cortado_por_el_borde(d, ancho, alto)]
+    detecciones.sort(key=lambda d: cv2.contourArea(d.esquinas.astype(np.float32)), reverse=True)
+
+    mejor, nombre, confianza = None, None, 0.0
+    for deteccion in detecciones:
+        nombre, confianza = identificar(enderezar(frame, deteccion.esquinas))
+        if nombre is not None:
+            mejor = deteccion
+            break
+    if mejor is None:
+        return None, None
 
     cartel = GRAFO["carteles"][nombre]
     nodo = cartel["nodos"][0]      # si el cartel está en dos nodos gemelos, están en el mismo punto
     pos, confianza_pos = posicion(mejor.esquinas, cartel)
-    estado.camino = ruta(nodo, destino)
-    return decidir(estado.camino, pos, min(mejor.confianza, confianza, confianza_pos), estado)
+    confianza_total = min(mejor.confianza, confianza, confianza_pos)
+    debug = {"nodo": nodo,
+             "x": round(pos.x, 2) if pos else None,
+             "y": round(pos.y, 2) if pos else None,
+             "rumbo": round(pos.rumbo_grados) if pos else None,
+             "confianza": round(confianza_total, 2)}
 
+    if estado.destino is None:      # todavía no dijo a dónde va (los avisos se agregan en la tarea 10)
+        return None, debug
+    estado.camino = ruta(nodo, estado.destino)
+    return decidir(estado.camino, pos, confianza_total, estado), debug
 
-def main(destino: int = 12, cantidad_frames: int = 3) -> None:
-    print(f"Grafo: {len(GRAFO['nodos'])} nodos, {len(GRAFO['carteles'])} carteles")
-    estado = Estado()
-
-    for _ in range(cantidad_frames):
-        inicio = time.perf_counter()
-        texto = procesar_frame(capturar(), destino, estado)
-        if texto:
-            hablar(texto)
-        print(f"frame procesado en {(time.perf_counter() - inicio) * 1000:.1f} ms")
-
-
-if __name__ == "__main__":
-    main()

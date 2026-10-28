@@ -6,3 +6,6 @@ opencv-python
 numpy
 onnx
 onnxruntime
+uvicorn
+pydantic
+python-multipart
