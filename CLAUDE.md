@@ -40,7 +40,7 @@ raspi  ◀──────audio──────  Node: STT y TTS ◀──�
 Todos los frames pasan por `decidir()`, también los que no tienen cartel. Gana el primer caso que se cumple:
 1. **Callado:** después de llegar no dice nada hasta que la persona vuelva a hablar. Cualquier `/destino` lo saca, aunque no se le entienda.
 2. **Sin destino:** "Decime a dónde querés ir." Gana aunque tampoco vea carteles.
-3. **Sin posición válida** (no vio un cartel identificado, o solvePnP dio poca confianza: cuentan igual): se calla, y si pasan más de `SIN_CARTEL_S = 10` s desde la última posición válida dice "Mové la cabeza despacio." El reloj arranca de nuevo cuando llega un destino.
+3. **Sin posición válida** (no vio un cartel identificado, o solvePnP dio poca confianza: cuentan igual): se calla, y si pasan más de `SIN_CARTEL_S = 10` s desde la última posición válida dice "Mové la cabeza despacio." El reloj arranca de nuevo cuando llega un destino.Después lo repite como máximo cada REPETIR_MOVER_S = 15 s (las demás frases, cada 5 s).
 4. **Llegada:** "Llegaste a … La puerta está a tu …", borra el destino y pasa a callado.
 5. **Instrucción:** "Girá a la derecha y avanzá 3 metros", etc.
 

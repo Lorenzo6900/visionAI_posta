@@ -12,7 +12,8 @@ app.use(express.json());
 // Variables de entorno con valores por defecto
 const PORT = process.env.PORT || 3000;
 const IA_URL = process.env.IA_URL || "http://localhost:8000";
-const ORT_API_KEY = process.env.ORT_API_KEY || "sk-29b4ad5bea2de3a08666b543932c119c191d0dd8d91a9814";
+const ORT_API_KEY = process.env.ORT_API_KEY;   // va solo en el .env, nunca en el código
+if (!ORT_API_KEY) console.warn("⚠️ Falta ORT_API_KEY en el .env: /audio no va a poder transcribir");
 const ORT_TRANSCRIBE_URL = process.env.ORT_TRANSCRIBE_URL || "https://ia-tic.ort.edu.ar/api/v1/audio/transcriptions";
 const ORT_MODEL_TRANSCRIPT = process.env.ORT_MODEL_TRANSCRIPT || "tic-transcript";
 
@@ -93,7 +94,7 @@ app.post('/frame', upload.single('imagen'), async (req, res) => {
 // ====================================================================
 // 2. ENDPOINT: /audio (Procesamiento de voz al presionar el botón)
 // ====================================================================
-app.post('/audio', upload.single('file'), async (req, res) => {
+app.post('/audio', upload.single('audio'), async (req, res) => {
   let rutaAudioTemp = req.file?.path;
   let mp3SalidaTemp = null;
 

@@ -28,6 +28,7 @@ UMBRAL_NMS = 0.45        # cajas que se pisan más que esto se consideran el mis
 CONFIANZA_MINIMA = 0.6   # de si hay o no confianza de que se sabe donde esta la persona.
 REPETIR_CADA_S = 5.0     #esto para no repetir la misma instruccion x cada frame.
 SIN_CARTEL_S = 10.0      # con destino y sin posición válida durante esto, pide mover la cabeza
+REPETIR_MOVER_S = 15.0   # cada cuánto repite "Mové la cabeza despacio." mientras siga sin cartel
 LLEGADA_M = 1.0          # a menos de esto de un nodo, se considera que ya llegó
 ERROR_MAXIMO_PX = 3.0    # error de reproyección de solvePnP; más que esto = posición poco confiable
 COCIENTE_AMBIGUO = 2.0   # si la 2da solución de solvePnP encaja casi tan bien como la 1ra (menos de 2 veces peor), no se sabe cuál es
@@ -277,7 +278,8 @@ def decidir(camino: list[int], pos: Posicion | None, confianza: float, estado: E
             instruccion = (accion, objetivo["id"])
             texto = f"{accion} {metros} metros."
 
-    if instruccion == estado.ultima_instruccion and ahora - estado.ultima_vez < REPETIR_CADA_S:
+    repetir_cada = REPETIR_MOVER_S if instruccion[0] == "sin_cartel" else REPETIR_CADA_S
+    if instruccion == estado.ultima_instruccion and ahora - estado.ultima_vez < repetir_cada:
         return None
     estado.ultima_instruccion = instruccion
     estado.ultima_vez = ahora
