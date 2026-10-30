@@ -105,7 +105,7 @@ Las fotos están en `C:\VisionAI\embeddings\galeria\M01..M19` (fuera del repo). 
 3. Medir el error de posición en metros (con `debug`), las instrucciones correctas y la latencia total. No hay objetivo de tiempo: lo importante es que ande.
 
 ## Pendientes conocidos
-- `data/calibracion.npz` actual no sirve (hecho a ~640x480, k3 ≈ −48). `main.py` usa una K nominal hasta que llegue la de Ivan.
+- La calibración de Ivan (`data/calibracion.npz`) es de la Pi Camera en modo 1640x1232 -> 1280x720. Solo vale con ese modo y sin tocar el foco del lente; si se toca, hay que recalibrar. El cliente de la raspi tiene que sacar las fotos en ese modo.
 - En Neon faltan 6 aristas de los gemelos lab_1 (19) y aula_214 (29). Mientras tanto las agrega `ARISTAS_FALTANTES` en `generar_grafo.py`.
 - El código de esquinas de Ivan encuentra las esquinas en ~45% de las detecciones (falla con carteles blancos o cortados por el borde).
 - La galería tiene pocas fotos de algunos carteles (M15 tiene 2) y pocas nítidas.

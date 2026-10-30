@@ -16,8 +16,8 @@ import cv2
 # Resolucion (ancho, alto) con la que se calibro. Las fotos y los videos tienen que ser asi.
 TAMANO_CALIBRACION = (1280, 720)
  
-# Por defecto, el calibracion.npz que esta al lado de este archivo
-RUTA_CALIBRACION = Path(__file__).with_name("calibracion.npz")
+# Por defecto, la calibracion del repo (data/calibracion.npz), la misma que usa main.py
+RUTA_CALIBRACION = Path(__file__).resolve().parents[2] / "data" / "calibracion.npz"
  
  
 def cargar_calibracion(ruta=RUTA_CALIBRACION):

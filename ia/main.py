@@ -22,6 +22,7 @@ RAIZ = Path(__file__).resolve().parent.parent
 RUTA_GRAFO = RAIZ / "data" / "grafo.json"
 RUTA_YOLO = RAIZ / "models" / "best.pt"
 RUTA_GALERIA = RAIZ / "data" / "galeria.npz"     # se arma con herramientas/generar_galeria.py
+RUTA_CALIBRACION = RAIZ / "data" / "calibracion.npz"  # la de Ivan: Pi Camera en modo 1640x1232 -> 1280x720
 
 UMBRAL_DETECCION = 0.5   # confianza mínima de YOLO para aceptar un cartel
 UMBRAL_NMS = 0.45        # cajas que se pisan más que esto se consideran el mismo cartel
@@ -37,12 +38,10 @@ PARECIDO_MINIMO = 0.75   # el cartel más parecido de la galería se tiene que p
 MARGEN_MINIMO = 0.04     # y le tiene que ganar al segundo cartel por al menos esto (si no: duda entre dos)
 MARGEN_BORDE_PX = 5      # una caja a menos de esto del borde de la foto se toma como cartel cortado
 
-# Cámara: K nominal a 1280x720, la misma que herramientas/solvePNP.py, hasta que Ivan recalibre.
-# (data/calibracion.npz no sirve: está hecho a otra resolución y tiene k3 ≈ −48.)
-K_CAMARA = np.array([[1060, 0, 640],
-                     [0, 1060, 360],
-                     [0,    0,   1]], dtype=np.float64)
-DISTORSION = np.zeros(5)
+# Cámara: si no hay una calibración válida, se usa esta K nominal a 1280x720 (sin distorsión)
+K_NOMINAL = np.array([[1060, 0, 640],
+                      [0, 1060, 360],
+                      [0,    0,   1]], dtype=np.float64)
 
 # Ángulos: este=0, norte=90, oeste=180, sur=270 (x crece al este, y al norte).
 # Positivo = antihorario, o sea que girar a la izquierda suma grados.
@@ -102,10 +101,28 @@ def cargar_galeria(ruta: Path = RUTA_GALERIA) -> dict:
         "nombres": np.array([nombre_de[c] for c in datos["codigos"]]),  # M01 -> impacto_social
     }
 
+def cargar_calibracion(ruta: Path = RUTA_CALIBRACION) -> tuple[np.ndarray, np.ndarray]:
+    """K y distorsión de la cámara (las guarda herramientas/calcular_calibracion.py).
+    Solo valen para fotos de 1280x720 y sin tocar el foco del lente.
+    Si el archivo no está o no parece de 1280x720, usa la K nominal y avisa."""
+    if not ruta.exists():
+        print(f"AVISO: no está {ruta}; uso la K nominal (las distancias pueden estar corridas)")
+        return K_NOMINAL, np.zeros(5)
+    datos = np.load(ruta)
+    K = datos["matriz_intrinseca"].astype(np.float64)
+    distorsion = datos["coef_distorsion"].astype(np.float64).ravel()
+    # En una foto de 1280x720 el centro óptico tiene que caer cerca del centro (640, 360)
+    if abs(K[0, 2] - 640) > 100 or abs(K[1, 2] - 360) > 100:
+        print(f"AVISO: {ruta} no parece de 1280x720 (centro en {K[0, 2]:.0f}, {K[1, 2]:.0f}); uso la K nominal")
+        return K_NOMINAL, np.zeros(5)
+    return K, distorsion
+
+
 
 GRAFO = cargar_grafo()
 GALERIA = cargar_galeria()
 YOLO = ModeloYOLO(RUTA_YOLO)
+K_CAMARA, DISTORSION = cargar_calibracion()
 
 
 # ---------- Piezas del pipeline ----------

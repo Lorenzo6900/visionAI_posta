@@ -11,7 +11,7 @@ from ultralytics import YOLO
  
 # El archivo con tu codigo de la Clase 11. Si lo guardaste con otro nombre,
 # cambia "esquinas" por ese nombre (sin el .py).
-from esquinas import esquinas_en_caja
+from modelo_esquinas import esquinas_en_caja
 from calcular_pose import calcular_pose, cargar_calibracion, TAMANO_CALIBRACION
  
 RUTA_VIDEO = "clip_003_dia_2.mp4"     # o 0 para la camara
