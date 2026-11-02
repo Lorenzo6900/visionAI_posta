@@ -311,36 +311,51 @@ def cortado_por_el_borde(deteccion: Deteccion, ancho: int, alto: int) -> bool:
             or x2 > ancho - MARGEN_BORDE_PX or y2 > alto - MARGEN_BORDE_PX)
 
 
-def procesar_frame(frame: np.ndarray, estado: Estado) -> tuple[str | None, dict | None]:
-    """Devuelve (texto a decir, debug). El texto es None si conviene callar; debug es None si no
-    se reconoció ningún cartel (si no, trae nodo, x, y, rumbo y confianza para probar la posición)."""
-    detecciones = [d for d in detectar(frame) if d.esquinas_refinadas]
+def procesar_frame(frame: np.ndarray, estado: Estado) -> tuple[str | None, dict]:
+    """Devuelve (texto a decir, debug). El texto es None si conviene callar.
+    debug siempre trae "motivo" (por qué hay o no hay posición); si se reconoció un cartel,
+    trae además nodo, x, y, rumbo y confianza para probar la posición.
+    Cada frame deja una línea [frame] en la terminal de uvicorn."""
+    todas = detectar(frame)
+    con_esquinas = [d for d in todas if d.esquinas_refinadas]
 
     # Elección del cartel: se descartan los cortados por el borde y los que identificar() no reconoce,
     # y de los que quedan se usa el más grande (el más cercano: solvePnP es más preciso).
     alto, ancho = frame.shape[:2]
-    detecciones = [d for d in detecciones if not cortado_por_el_borde(d, ancho, alto)]
-    detecciones.sort(key=lambda d: cv2.contourArea(d.esquinas.astype(np.float32)), reverse=True)
+    enteras = [d for d in con_esquinas if not cortado_por_el_borde(d, ancho, alto)]
+    enteras.sort(key=lambda d: cv2.contourArea(d.esquinas.astype(np.float32)), reverse=True)
 
     mejor, nombre, confianza = None, None, 0.0
-    for deteccion in detecciones:
+    for deteccion in enteras:
         nombre, confianza = identificar(enderezar(frame, deteccion.esquinas))
         if nombre is not None:
             mejor = deteccion
             break
     if mejor is None:
-        return decidir([], None, 0.0, estado), None # # sin cartel igual se decide: puede tocar pedir destino o mover la cabeza.
+        if not todas:
+            motivo = "YOLO no ve ningún cartel"
+        elif not con_esquinas:
+            motivo = "no encontró las esquinas del cartel"
+        elif not enteras:
+            motivo = "cartel cortado por el borde"
+        else:
+            motivo = "no reconoció el cartel"
+        print(f"[frame] {motivo}")
+        # sin cartel igual se decide: puede tocar pedir destino o mover la cabeza
+        return decidir([], None, 0.0, estado), {"motivo": motivo}
 
     cartel = GRAFO["carteles"][nombre]
     nodo = cartel["nodos"][0]      # si el cartel está en dos nodos gemelos, están en el mismo punto
     pos, confianza_pos = posicion(mejor.esquinas, cartel)
     confianza_total = min(mejor.confianza, confianza, confianza_pos)
-    debug = {"nodo": nodo,
+    motivo = "ok" if confianza_total >= CONFIANZA_MINIMA else "posición dudosa (solvePnP o YOLO)"
+    debug = {"motivo": motivo,
+             "nodo": nodo,
              "x": round(pos.x, 2) if pos else None,
              "y": round(pos.y, 2) if pos else None,
-             "rumbo": round(pos.rumbo_grados) if pos else None,
+             "rumbo": round(pos.rumbo_grados, 2) if pos else None,
              "confianza": round(confianza_total, 2)}
+    print(f"[frame] {motivo}: cartel {nombre} (nodo {nodo}) x={debug['x']} y={debug['y']} rumbo={debug['rumbo']}")
 
     estado.camino = ruta(nodo, estado.destino) if estado.destino is not None else []
     return decidir(estado.camino, pos, confianza_total, estado), debug
-

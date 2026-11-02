@@ -15,14 +15,14 @@ raspi  ◀──────audio──────  Node: STT y TTS ◀──�
 ### Contrato de la API
 **Raspi → Node**
 - `POST /frame`: `multipart/form-data`, campo `imagen` (JPEG, 1280x720). Responde con audio, o `204 No Content` si no hay nada que decir.
-- `POST /audio`: el audio grabado mientras se apretaba el botón (wav o webm, lo decide Tincho). Responde con el audio de la frase de confirmación.
+- `POST /audio`: `multipart/form-data`, campo `audio` (lo que se grabó mientras se apretaba el botón, wav). Responde con el audio de la frase de confirmación.
 
 **Node → IA** (FastAPI en `http://localhost:8000`)
 - `POST /frame`: el mismo JPEG, `multipart/form-data`, campo `imagen`. Devuelve:
   ```json
   {"texto": "Girá a la derecha y avanzá 3 metros.", "debug": {"nodo": 10, "x": 0.4, "y": 29.8, "rumbo": 92, "confianza": 1.0}}
   ```
-  `"texto": null` si conviene callar. `debug` es para probar la posición sin escuchar el audio; Node lo ignora.
+  `"texto": null` si conviene callar. `debug` es para probar la posición sin escuchar el audio; Node lo ignora. Siempre trae `motivo`: `ok`, o por qué no hay posición (`YOLO no ve ningún cartel`, `no encontró las esquinas del cartel`, `cartel cortado por el borde`, `no reconoció el cartel`, `posición dudosa`). Cada frame también deja una línea `[frame] ...` en la terminal de uvicorn.
 - `POST /destino`: `{"texto": "quiero ir al baño"}` (lo que transcribió Node). Devuelve:
   ```json
   {"frase": "Voy a llevarte a baño", "destino_id": 23}
@@ -40,7 +40,7 @@ raspi  ◀──────audio──────  Node: STT y TTS ◀──�
 Todos los frames pasan por `decidir()`, también los que no tienen cartel. Gana el primer caso que se cumple:
 1. **Callado:** después de llegar no dice nada hasta que la persona vuelva a hablar. Cualquier `/destino` lo saca, aunque no se le entienda.
 2. **Sin destino:** "Decime a dónde querés ir." Gana aunque tampoco vea carteles.
-3. **Sin posición válida** (no vio un cartel identificado, o solvePnP dio poca confianza: cuentan igual): se calla, y si pasan más de `SIN_CARTEL_S = 10` s desde la última posición válida dice "Mové la cabeza despacio." El reloj arranca de nuevo cuando llega un destino.Después lo repite como máximo cada REPETIR_MOVER_S = 15 s (las demás frases, cada 5 s).
+3. **Sin posición válida** (no vio un cartel identificado, o solvePnP dio poca confianza: cuentan igual): se calla, y si pasan más de `SIN_CARTEL_S = 10` s desde la última posición válida dice "Mové la cabeza despacio." El reloj arranca de nuevo cuando llega un destino. Después lo repite como máximo cada `REPETIR_MOVER_S = 15` s (las demás frases, cada 5 s).
 4. **Llegada:** "Llegaste a … La puerta está a tu …", borra el destino y pasa a callado.
 5. **Instrucción:** "Girá a la derecha y avanzá 3 metros", etc.
 
@@ -61,14 +61,16 @@ En `ia/herramientas/destino.py` (`buscar_destino(texto, GRAFO["nodos"])`), porta
 
 ## Estructura
 - `ia/main.py`: el pipeline y el motor de decisiones. No se corre solo: `procesar_frame(frame, estado)` devuelve `(texto, debug)` y lo llama el servidor.
-- `ia/servidor.py`: la app FastAPI con `POST /frame` y `POST /destino` y el único `Estado` en memoria. Se levanta desde la raíz con `uvicorn ia.servidor:app --host 127.0.0.1 --port 8000`; en `http://127.0.0.1:8000/docs` se prueban los endpoints a mano.
+- `ia/servidor.py`: la app FastAPI con `POST /frame` y `POST /destino` y el único `Estado` en memoria. Se levanta con `levantar_servidor.bat` (o `uvicorn ia.servidor:app --host 0.0.0.0 --port 8000`: `0.0.0.0` para que la raspi pueda llegar). En `http://127.0.0.1:8000/docs` se prueban los endpoints a mano.
 - `ia/embeddings.py`: `enderezar()` (recorte de 160x190) y `vector()` (MobileNetV2). Lo usan la galería y `identificar()`; los dos tienen que hacer exactamente lo mismo.
 - `ia/herramientas/`:
   - Scripts de PC: `generar_grafo.py`, `generar_galeria.py` (recortar / vectores), `marcar_a_mano.py`, `probar_detectar.py`.
   - Usados por `main.py`: `modelo_esquinas.py` (esquinas de Ivan) y `ruteo.py` (Dijkstra). Si se cambian, cambia el pipeline.`destino.py` (texto -> destino) lo usa `servidor.py`.
   - Demos de clase: el resto.
-- `voz/backend/`: servidor Node de Tincho. Las credenciales van en `voz/backend/.env`, que no se sube.
-- `voz/cliente.py`: stub viejo. Con la arquitectura nueva, el cliente de la raspi lo hace Tincho.
+- `voz/backend/`: servidor Node de Tincho (`server.js`, `npm start`). Las credenciales van en `voz/backend/.env` (copiar `.env.example`), que no se sube. `comu.js`, `busquedaService.js`, `localizacion.js`, `db.js` y `transcripcion.js` son de la arquitectura vieja.
+- `voz/cliente.py`: stub viejo, no se usa.
+- `raspi/cliente_raspi.py`: el cliente de la raspi (cámara con la configuración de Ivan, botón en GPIO 17, `mpg123` y `arecord`). Lee `SERVIDOR`, `MICROFONO` y `PARLANTE` de variables de entorno.
+- `levantar_servidor.bat`: doble clic en la PC servidor; abre la IA y Node, y muestra la IP.
 - `data/`: `grafo.json`, `galeria.npz` (158 vectores de los 19 carteles), las 3 tablas de Neon en CSV, `calibracion.npz`, `dataset.yaml`.
 - `models/best.pt`: YOLO11n entrenado (mAP50 ≈ 0.92 en val d1+d2). Es el único peso que se sube a git.
 - `docs/cvat/`: docker-compose de CVAT.
@@ -80,29 +82,32 @@ Las fotos están en `C:\VisionAI\embeddings\galeria\M01..M19` (fuera del repo). 
 3. `python -m ia.herramientas.generar_galeria vectores C:/VisionAI/embeddings/galeria`
 
 ## Plan y reparto
-**Primero (desbloquean al resto)**
-1. Acordar entre los tres el contrato de la API (la propuesta está arriba).
-2. Hecho: Ivan, calibración real a 1280x720 en `data/calibracion.npz`.
-3. Subir `data/galeria.npz` al repo.
+**Hecho y probado**
+- IA (Lorenzo): elección del cartel, texto -> destino, endpoints FastAPI, motor de decisiones, carga de la calibración, motivo de cada frame.
+- Calibración y validación de solvePnP (Ivan).
+- Node (Tincho): `POST /frame` y `POST /audio` con STT de ORT y TTS (gTTS).
+- Cliente de la raspi (Tincho): probado de punta a punta el 2026-11-02 (cámara en el modo de Ivan -> Node -> IA -> instrucciones). Raspi -> servidor ~120 ms por foto.
+- Arranque automático: servicio `visionai` en la raspi y `levantar_servidor.bat` en la PC.
 
-**IA (Lorenzo e Ivan)**
-- Hecho: calibración de Ivan cargada en `main.py` (`cargar_calibracion()`, desde `data/calibracion.npz`) y solvePnP validado por Ivan con esa calibración.
-- Hecho: elección del cartel del frame, texto -> destino, endpoints FastAPI y casos nuevos en `decidir()`.
+**Falta**
+1. **Audio (Yonatan, miércoles 2026-11-04):** adaptador USB + auriculares de cable (el micrófono Bluetooth de la Pi 3 no anduvo). Completar `MICROFONO` y `PARLANTE` en `~/visionai.env` con lo que diga `arecord -l`.
+2. **IP fija del servidor:** pedida al profesor. Mientras tanto, si cambia la IP de la PC, hay que actualizarla en `~/visionai.env`.
+3. **Prueba en el pasillo:** recorrido completo hablando, llegada ("Llegaste a…", nunca probada), "Mové la cabeza", cambio de destino, error de posición en metros (con `debug`), latencia total y contar los motivos de `[frame]` para ver dónde se pierden los frames.
 
-**Backend (Tincho)**
-- `POST /audio` y `POST /frame` como en el contrato, sin el chat de IA ni `/destinos/buscar`.
-- TTS devuelto en la misma respuesta.
-- Dirección fija del servidor de ORT. Probar que la raspi lo alcanza desde el WiFi de la demo, y que el servidor tiene salida a internet (STT y TTS usan servicios externos).
-- Script que arranque juntos la IA (`uvicorn`) y Node (`npm start`).
+**Para decidir en equipo**
+- Las instrucciones son relativas a hacia dónde mira la cabeza (la cámara), no el cuerpo: si la persona gira la cabeza, cambia la indicación.
+- Qué servidor se usa en la demo (la PC de Lorenzo o el del profesor).
 
-**Raspi (Tincho, con Ivan en cámara y botón)**
-- Cliente Python: manda frames con Picamera2 a 1280x720 desde que se enciende; graba mientras el botón está apretado y manda el audio; reproduce sin pisar un audio que todavía suena; arranca solo al encender (systemd).
-- Raspberry Pi OS Lite de 64 bits: `dpkg --print-architecture` tiene que dar `arm64`.
+## Cómo arrancar todo
+1. PC servidor: doble clic en `levantar_servidor.bat`. Anotar la IP que muestra.
+2. Prender la raspi: el cliente arranca solo (servicio `visionai`, lee `~/visionai.env`).
+3. Solo si cambió la IP de la PC: en la raspi, `nano ~/visionai.env` (línea `SERVIDOR=http://IP:3000`) y `sudo systemctl restart visionai`.
+4. Sin micrófono, el destino se fija desde la raspi con:
+   `curl -X POST http://IP:8000/destino -H "Content-Type: application/json" -d '{"texto": "quiero ir al baño"}'`
+5. Ver qué hace: `journalctl -u visionai -f` en la raspi, y las líneas `[frame]` en la ventana de la IA.
+6. Apagar la raspi con `sudo poweroff` antes de desenchufarla.
 
-**Integración**
-1. Probar la tubería completa con una IA falsa que devuelva siempre el mismo texto (valida raspi, backend, red y TTS).
-2. Conectar la IA real y probar en un tramo con carteles físicos.
-3. Medir el error de posición en metros (con `debug`), las instrucciones correctas y la latencia total. No hay objetivo de tiempo: lo importante es que ande.
+Otros comandos de la raspi: `sudo systemctl stop|start|restart visionai`, `systemctl status visionai`. Para actualizar el cliente: `cd ~/visionAI_posta && git pull` y `sudo systemctl restart visionai`.
 
 ## Pendientes conocidos
 - La calibración de Ivan (`data/calibracion.npz`) es de la Pi Camera en modo 1640x1232 -> 1280x720. Solo vale con ese modo y sin tocar el foco del lente; si se toca, hay que recalibrar. El cliente de la raspi tiene que sacar las fotos en ese modo.
@@ -110,6 +115,9 @@ Las fotos están en `C:\VisionAI\embeddings\galeria\M01..M19` (fuera del repo). 
 - El código de esquinas de Ivan encuentra las esquinas en ~45% de las detecciones (falla con carteles blancos o cortados por el borde).
 - La galería tiene pocas fotos de algunos carteles (M15 tiene 2) y pocas nítidas.
 - Si Node manda un pedido mal armado (sin el campo `imagen` o sin `texto`), FastAPI responde `422`, no `200`.
+- La red de ORT corta conexiones a veces: se pierden algunas fotos (en Node aparece "Request aborted") y la IP de la PC cambia al reconectarse.
+- `ia-tic.ort.edu.ar` (el STT) solo funciona dentro de la red de ORT.
+- Las claves de Neon e ia-tic estuvieron en el repo desde el primer commit: hay que generar nuevas.
 
 ## Reglas
 - No subir el dataset ni imágenes al repo. Los datos están en `C:\VisionAI` y en Roboflow.
