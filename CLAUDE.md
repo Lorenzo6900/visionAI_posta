@@ -82,11 +82,11 @@ Las fotos están en `C:\VisionAI\embeddings\galeria\M01..M19` (fuera del repo). 
 ## Plan y reparto
 **Primero (desbloquean al resto)**
 1. Acordar entre los tres el contrato de la API (la propuesta está arriba).
-2. Ivan: calibración real, con la misma cámara y a 1280x720, en `data/calibracion.npz`.
+2. Hecho: Ivan, calibración real a 1280x720 en `data/calibracion.npz`.
 3. Subir `data/galeria.npz` al repo.
 
 **IA (Lorenzo e Ivan)**
-- Meter la calibración real en `main.py` (hoy usa la K nominal `K_CAMARA`) y verificar solvePnP con fotos tomadas desde posiciones conocidas. Es el control más importante: un solvePnP malo da instrucciones equivocadas.
+- Hecho: calibración de Ivan cargada en `main.py` (`cargar_calibracion()`, desde `data/calibracion.npz`) y solvePnP validado por Ivan con esa calibración.
 - Hecho: elección del cartel del frame, texto -> destino, endpoints FastAPI y casos nuevos en `decidir()`.
 
 **Backend (Tincho)**
@@ -106,10 +106,9 @@ Las fotos están en `C:\VisionAI\embeddings\galeria\M01..M19` (fuera del repo). 
 
 ## Pendientes conocidos
 - La calibración de Ivan (`data/calibracion.npz`) es de la Pi Camera en modo 1640x1232 -> 1280x720. Solo vale con ese modo y sin tocar el foco del lente; si se toca, hay que recalibrar. El cliente de la raspi tiene que sacar las fotos en ese modo.
-- En Neon faltan 6 aristas de los gemelos lab_1 (19) y aula_214 (29). Mientras tanto las agrega `ARISTAS_FALTANTES` en `generar_grafo.py`.
+- En Neon faltan 6 aristas de los gemelos lab_1 (19) y aula_214 (29). En `data/grafo.json` ya están: las agrega `ARISTAS_FALTANTES` en `generar_grafo.py`. Falta solo cargarlas en Neon (Tincho).
 - El código de esquinas de Ivan encuentra las esquinas en ~45% de las detecciones (falla con carteles blancos o cortados por el borde).
 - La galería tiene pocas fotos de algunos carteles (M15 tiene 2) y pocas nítidas.
-- `requirements-raspi.txt` es de la arquitectura vieja (onnxruntime en la raspi); hay que revisarlo para el cliente nuevo.
 - Si Node manda un pedido mal armado (sin el campo `imagen` o sin `texto`), FastAPI responde `422`, no `200`.
 
 ## Reglas
