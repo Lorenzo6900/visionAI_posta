@@ -79,7 +79,7 @@ app.post('/frame', upload.single('imagen'), async (req, res) => {
     }
 
     console.log(`🔊 [Frame] Generando audio: "${textoAudio}"`);
-    mp3SalidaTemp = `frame_${Date.now()}.mp3`;
+    mp3SalidaTemp = path.join(TEMP, `frame_${Date.now()}.mp3`);
     await generarAudioMP3(textoAudio, mp3SalidaTemp);
 
     const bufferMp3 = fs.readFileSync(mp3SalidaTemp);
@@ -156,7 +156,7 @@ app.post('/audio', upload.single('audio'), async (req, res) => {
 
     // Step 3: Convertir fraseRespuesta a MP3 con gTTS
     console.log(`🔊 [Audio Respuesta]: "${fraseRespuesta}"`);
-    mp3SalidaTemp = `destino_${Date.now()}.mp3`;
+    mp3SalidaTemp = path.join(TEMP, `destino_${Date.now()}.mp3`);
     await generarAudioMP3(fraseRespuesta, mp3SalidaTemp);
 
     const bufferMp3 = fs.readFileSync(mp3SalidaTemp);
@@ -167,7 +167,7 @@ app.post('/audio', upload.single('audio'), async (req, res) => {
     console.error("❌ Error grave en /audio:", error.message);
     // Fallback asegurado para no dejar al usuario sin respuesta hablada
     try {
-      mp3SalidaTemp = `error_${Date.now()}.mp3`;
+      mp3SalidaTemp = path.join(TEMP, `error_${Date.now()}.mp3`);
       await generarAudioMP3("No te entendí. ¿A dónde querés ir?", mp3SalidaTemp);
       const bufferMp3 = fs.readFileSync(mp3SalidaTemp);
       res.setHeader('Content-Type', 'audio/mpeg');
