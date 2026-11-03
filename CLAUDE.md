@@ -7,7 +7,7 @@ Sistema de navegación en interiores para personas con discapacidad visual. Una 
 raspi  ──frame / audio──▶  Node (Tincho)  ──frame / texto──▶  IA, FastAPI (ia/)
 raspi  ◀──────audio──────  Node: STT y TTS ◀──────texto───────  IA
 ```
-- **La IA no corre en la raspi**: corre en un servidor de ORT, junto con Node, en la misma máquina. Por eso en la raspi no hace falta PyTorch ni ONNX.
+- **La IA no corre en la raspi**: corre en el hosting del colegio (HosTICer), como dos apps del proyecto `visionai`: `ia` (FastAPI) y `api` (Node). Ver "Hosting del colegio". Por eso en la raspi no hace falta PyTorch ni ONNX.
 - **La raspi nunca le habla directo a la IA.** Node es la puerta de entrada, porque pasa el texto a audio antes de devolverlo.
 - **Hay una sola raspi y un solo usuario a la vez.** La IA guarda un único estado global en memoria (destino, última instrucción, último cartel visto). No hay sesión ni autenticación.
 - **Las indicaciones las arma la IA con el grafo**, no un chat de IA: el chat no conoce el mapa ni dónde está la persona.
@@ -17,7 +17,8 @@ raspi  ◀──────audio──────  Node: STT y TTS ◀──�
 - `POST /frame`: `multipart/form-data`, campo `imagen` (JPEG, 1280x720). Responde con audio, o `204 No Content` si no hay nada que decir.
 - `POST /audio`: `multipart/form-data`, campo `audio` (lo que se grabó mientras se apretaba el botón, wav). Responde con el audio de la frase de confirmación.
 
-**Node → IA** (FastAPI en `http://localhost:8000`)
+**Node → IA** (la dirección sale de `IA_URL`: en el hosting `https://proyectos-tic.ort.edu.ar/visionai/ia`, en la PC `http://localhost:8000`)
+- `GET /health`: `{"ok": true}`. Lo usa el hosting para saber si la app arrancó (Node también tiene `GET /health`).
 - `POST /frame`: el mismo JPEG, `multipart/form-data`, campo `imagen`. Devuelve:
   ```json
   {"texto": "Girá a la derecha y avanzá 3 metros.", "debug": {"nodo": 10, "x": 0.4, "y": 29.8, "rumbo": 92, "confianza": 1.0}}
@@ -62,7 +63,8 @@ En `ia/herramientas/destino.py` (`buscar_destino(texto, GRAFO["nodos"])`), porta
 ## Estructura
 - `ia/main.py`: el pipeline y el motor de decisiones. No se corre solo: `procesar_frame(frame, estado)` devuelve `(texto, debug)` y lo llama el servidor.
 - `ia/servidor.py`: la app FastAPI con `POST /frame` y `POST /destino` y el único `Estado` en memoria. Se levanta con `levantar_servidor.bat` (o `uvicorn ia.servidor:app --host 0.0.0.0 --port 8000`: `0.0.0.0` para que la raspi pueda llegar). En `http://127.0.0.1:8000/docs` se prueban los endpoints a mano.
-- `ia/embeddings.py`: `enderezar()` (recorte de 160x190) y `vector()` (MobileNetV2). Lo usan la galería y `identificar()`; los dos tienen que hacer exactamente lo mismo.
+- `main.py` y `requirements.txt` (raíz): la entrada que exige el hosting (`uvicorn main:app`). `main.py` solo importa la app de `ia/servidor.py` y manda la configuración de ultralytics/matplotlib a la carpeta temporal (el disco del hosting es de solo lectura). `requirements.txt` tiene las mismas versiones que `requirements-pc.txt`.
+- `ia/embeddings.py`: `enderezar()` (recorte de 160x190) y `vector()` (MobileNetV2). Lo usan la galería y `identificar()`; los dos tienen que hacer exactamente lo mismo. Los pesos se cargan de `models/mobilenet_v2.pth` (en el hosting no se pueden bajar de internet al arrancar).
 - `ia/herramientas/`:
   - Scripts de PC: `generar_grafo.py`, `generar_galeria.py` (recortar / vectores), `marcar_a_mano.py`, `probar_detectar.py`.
   - Usados por `main.py`: `modelo_esquinas.py` (esquinas de Ivan) y `ruteo.py` (Dijkstra). Si se cambian, cambia el pipeline.`destino.py` (texto -> destino) lo usa `servidor.py`.
@@ -72,7 +74,7 @@ En `ia/herramientas/destino.py` (`buscar_destino(texto, GRAFO["nodos"])`), porta
 - `raspi/cliente_raspi.py`: el cliente de la raspi (cámara con la configuración de Ivan, botón en GPIO 17, `mpg123` y `arecord`). Lee `SERVIDOR`, `MICROFONO` y `PARLANTE` de variables de entorno.
 - `levantar_servidor.bat`: doble clic en la PC servidor; abre la IA y Node, y muestra la IP.
 - `data/`: `grafo.json`, `galeria.npz` (158 vectores de los 19 carteles), las 3 tablas de Neon en CSV, `calibracion.npz`, `dataset.yaml`.
-- `models/best.pt`: YOLO11n entrenado (mAP50 ≈ 0.92 en val d1+d2). Es el único peso que se sube a git.
+- `models/best.pt`: YOLO11n entrenado (mAP50 ≈ 0.92 en val d1+d2). `models/mobilenet_v2.pth`: MobileNetV2 de ImageNet (IMAGENET1K_V1) para los vectores. Son los únicos pesos que se suben a git.
 - `docs/cvat/`: docker-compose de CVAT.
 
 ## Galería de embeddings
@@ -88,24 +90,41 @@ Las fotos están en `C:\VisionAI\embeddings\galeria\M01..M19` (fuera del repo). 
 - Node (Tincho): `POST /frame` y `POST /audio` con STT de ORT y TTS (gTTS).
 - Cliente de la raspi (Tincho): probado de punta a punta el 2026-11-02 (cámara en el modo de Ivan -> Node -> IA -> instrucciones). Raspi -> servidor ~120 ms por foto.
 - Arranque automático: servicio `visionai` en la raspi y `levantar_servidor.bat` en la PC.
+- Publicado en el hosting del colegio (2026-11-03): `ia` y `api` probadas de punta a punta desde la red de ORT (STT de ORT y gTTS andan: el hosting tiene internet).
 
 **Falta**
 1. **Audio (Yonatan, miércoles 2026-11-04):** adaptador USB + auriculares de cable (el micrófono Bluetooth de la Pi 3 no anduvo). Completar `MICROFONO` y `PARLANTE` en `~/visionai.env` con lo que diga `arecord -l`.
-2. **IP fija del servidor:** pedida al profesor. Mientras tanto, si cambia la IP de la PC, hay que actualizarla en `~/visionai.env`.
+2. **Apuntar la raspi al hosting:** en `~/visionai.env`, `SERVIDOR=https://proyectos-tic.ort.edu.ar/visionai/api` y `sudo systemctl restart visionai`. Con eso ya no hace falta la PC ni la IP fija.
 3. **Prueba en el pasillo:** recorrido completo hablando, llegada ("Llegaste a…", nunca probada), "Mové la cabeza", cambio de destino, error de posición en metros (con `debug`), latencia total y contar los motivos de `[frame]` para ver dónde se pierden los frames.
 
 **Para decidir en equipo**
 - Las instrucciones son relativas a hacia dónde mira la cabeza (la cámara), no el cuerpo: si la persona gira la cabeza, cambia la indicación.
-- Qué servidor se usa en la demo (la PC de Lorenzo o el del profesor).
+
+## Hosting del colegio (HosTICer)
+Docs: https://hosting-tic.ort.edu.ar/docs (recetas `fastapi-cv` y `node`). Panel: https://hosting-tic.ort.edu.ar (usuario: el DNI, contraseña del colegio). Todo esto solo funciona desde la red de ORT.
+
+| App | Receta | Dirección | Se publica con |
+|---|---|---|---|
+| `ia` | fastapi-cv (Python 3.13, CPU, 2 GB) | `https://proyectos-tic.ort.edu.ar/visionai/ia` | `git push tic-ia HEAD` (repo entero) |
+| `api` | node (256 MB) | `https://proyectos-tic.ort.edu.ar/visionai/api` | `git subtree push --prefix=voz/backend tic-voz main` (solo esa carpeta) |
+
+- Remotos (una vez por compu, el DNI sin puntos y sin `< >`): `git remote add tic-ia ssh://DNI@belgrano.ort.arg@vm-tic.ort.edu.ar:2222/visionai/ia.git` y `git remote add tic-voz ssh://DNI@belgrano.ort.arg@vm-tic.ort.edu.ar:2222/visionai/api.git`.
+- Se publica lo commiteado. El push siempre termina "bien": el resultado del build está en las líneas `remote:` o en la pestaña Deploy. Si el build falla, sigue la versión anterior.
+- nginx le saca el prefijo `/visionai/<app>` a la ruta: las apps ven `/frame`, `/destino`, `/health`.
+- El disco es de solo lectura salvo `/tmp` y `data/`: Node guarda los temporales en `os.tmpdir()`.
+- Variables de `api` (panel → Configuración): `ORT_API_KEY` e `IA_URL=https://proyectos-tic.ort.edu.ar/visionai/ia`. Cambiar una variable vuelve a publicar la app.
+- **`data/` se copia del repo solo en el primer deploy.** Si cambian `grafo.json`, `galeria.npz` o `calibracion.npz`, hay que subirlos a mano en el panel (app `ia` → Datos → Archivos).
+- Logs (las líneas `[frame]` de la IA, los mensajes de Node): panel → Logs de cada app.
 
 ## Cómo arrancar todo
-1. PC servidor: doble clic en `levantar_servidor.bat`. Anotar la IP que muestra.
-2. Prender la raspi: el cliente arranca solo (servicio `visionai`, lee `~/visionai.env`).
-3. Solo si cambió la IP de la PC: en la raspi, `nano ~/visionai.env` (línea `SERVIDOR=http://IP:3000`) y `sudo systemctl restart visionai`.
-4. Sin micrófono, el destino se fija desde la raspi con:
-   `curl -X POST http://IP:8000/destino -H "Content-Type: application/json" -d '{"texto": "quiero ir al baño"}'`
-5. Ver qué hace: `journalctl -u visionai -f` en la raspi, y las líneas `[frame]` en la ventana de la IA.
-6. Apagar la raspi con `sudo poweroff` antes de desenchufarla.
+Con el hosting (lo normal):
+1. Prender la raspi: el cliente arranca solo (servicio `visionai`, lee `~/visionai.env` con `SERVIDOR=https://proyectos-tic.ort.edu.ar/visionai/api`). Tiene que estar en el WiFi de ORT.
+2. Sin micrófono, el destino se fija desde la raspi con:
+   `curl -X POST https://proyectos-tic.ort.edu.ar/visionai/ia/destino -H "Content-Type: application/json" -d '{"texto": "quiero ir al baño"}'`
+3. Ver qué hace: `journalctl -u visionai -f` en la raspi, y los Logs de las apps en el panel.
+4. Apagar la raspi con `sudo poweroff` antes de desenchufarla.
+
+Para probar cambios en la PC sin publicar: doble clic en `levantar_servidor.bat` (muestra la IP), en la raspi `SERVIDOR=http://IP:3000` en `~/visionai.env` y `sudo systemctl restart visionai`; el destino con el mismo `curl` a `http://IP:8000/destino`. La IP de la PC cambia si se reconecta al WiFi.
 
 Otros comandos de la raspi: `sudo systemctl stop|start|restart visionai`, `systemctl status visionai`. Para actualizar el cliente: `cd ~/visionAI_posta && git pull` y `sudo systemctl restart visionai`.
 
@@ -115,7 +134,7 @@ Otros comandos de la raspi: `sudo systemctl stop|start|restart visionai`, `syste
 - El código de esquinas de Ivan encuentra las esquinas en ~45% de las detecciones (falla con carteles blancos o cortados por el borde).
 - La galería tiene pocas fotos de algunos carteles (M15 tiene 2) y pocas nítidas.
 - Si Node manda un pedido mal armado (sin el campo `imagen` o sin `texto`), FastAPI responde `422`, no `200`.
-- La red de ORT corta conexiones a veces: se pierden algunas fotos (en Node aparece "Request aborted") y la IP de la PC cambia al reconectarse.
+- La red de ORT corta conexiones a veces: se pierden algunas fotos (en Node aparece "Request aborted"). Con la PC como servidor, además su IP cambia al reconectarse.
 - `ia-tic.ort.edu.ar` (el STT) solo funciona dentro de la red de ORT.
 - Las claves de Neon e ia-tic estuvieron en el repo desde el primer commit: hay que generar nuevas.
 
