@@ -2,11 +2,14 @@ import 'dotenv/config';
 import express from 'express';
 import multer from 'multer';
 import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import gTTS from 'gtts';
 
 const app = express();
-const upload = multer({ dest: 'uploads/' });
-
+// En el hosting del colegio solo se puede escribir en /tmp: ahí van los archivos temporales
+const TEMP = os.tmpdir();
+const upload = multer({ dest: TEMP });
 app.use(express.json());
 
 // Variables de entorno con valores por defecto
@@ -36,6 +39,8 @@ async function fetchConTimeout(url, options = {}, timeoutMs = 5000) {
     clearTimeout(timeoutId);
   }
 }
+// El hosting del colegio lo consulta para saber si la app arrancó bien
+app.get('/health', (req, res) => res.send('ok'));
 
 // ====================================================================
 // 1. ENDPOINT: /frame (Recepción de fotos periódicas ~1/s)

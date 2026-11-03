@@ -24,6 +24,11 @@ ESTADO = Estado()
 # (así dos frames no pisan el estado ni usan YOLO al mismo tiempo).
 CANDADO = threading.Lock()
 
+@app.get("/health")
+def salud():
+    # El hosting del colegio lo consulta para saber si la app arrancó bien
+    return {"ok": True}
+
 
 class PedidoDestino(BaseModel):
     texto: str

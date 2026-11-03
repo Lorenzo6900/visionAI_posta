@@ -5,10 +5,10 @@ Lo usan herramientas/generar_galeria.py (en la PC, para armar data/galeria.npz) 
 en main.py (en cada frame). Los dos TIENEN que hacer exactamente lo mismo; si no, los vectores
 no se pueden comparar. Por eso está en un solo lugar.
 
-TODO: en la raspi no hay PyTorch. MobileNet se va a tener que exportar (ONNX u otro, a decidir
-con el equipo) y vector() cambiará por dentro, pero tiene que seguir dando los mismos números.
+Los pesos de MobileNetV2 (IMAGENET1K_V1) están en models/mobilenet_v2.pth: en el hosting del colegio
+la app no puede bajarlos de internet al arrancar.
 """
-
+from pathlib import Path
 import cv2
 import numpy as np
 import torch
@@ -18,6 +18,7 @@ from torchvision import transforms
 # Tamaño del recorte enderezado (el mismo que usaban herramientas/recortar_imagen.py y paraRecortar.py)
 ANCHO_RECORTE, ALTO_RECORTE = 160, 190
 
+RUTA_PESOS = Path(__file__).resolve().parent.parent / "models" / "mobilenet_v2.pth"
 _modelo = None
 _preparar = transforms.Compose([
     transforms.ToTensor(),
@@ -29,7 +30,8 @@ _preparar = transforms.Compose([
 def _cargar_modelo():
     global _modelo
     if _modelo is None:
-        _modelo = torchvision.models.mobilenet_v2(weights='IMAGENET1K_V1')
+        _modelo = torchvision.models.mobilenet_v2()
+        _modelo.load_state_dict(torch.load(RUTA_PESOS, map_location="cpu"))
         _modelo.classifier = torch.nn.Identity()   # le saco la capa que clasifica
         _modelo.eval()
     return _modelo
