@@ -26,7 +26,7 @@ RUTA_CALIBRACION = RAIZ / "data" / "calibracion.npz"  # la de Ivan: Pi Camera en
 
 UMBRAL_DETECCION = 0.5   # confianza mínima de YOLO para aceptar un cartel
 UMBRAL_NMS = 0.45        # cajas que se pisan más que esto se consideran el mismo cartel
-CONFIANZA_MINIMA = 0.6   # de si hay o no confianza de que se sabe donde esta la persona.
+CONFIANZA_MINIMA = 0.5   # de si hay o no confianza de que se sabe donde esta la persona.
 REPETIR_CADA_S = 5.0     #esto para no repetir la misma instruccion x cada frame.
 SIN_CARTEL_S = 10.0      # con destino y sin posición válida durante esto, pide mover la cabeza
 REPETIR_MOVER_S = 15.0   # cada cuánto repite "Mové la cabeza despacio." mientras siga sin cartel
