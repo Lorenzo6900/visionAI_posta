@@ -29,7 +29,7 @@ from picamera2 import Picamera2
 SERVIDOR_URL = os.environ.get("SERVIDOR", "http://192.168.1.50:3000")
 MICROFONO = os.environ.get("MICROFONO", "default")
 PARLANTE = os.environ.get("PARLANTE", "")
-PIN_BOTON = 17                 # Pin GPIO donde está conectado el botón
+PIN_BOTON = 21                 # Pin GPIO donde está conectado el botón
 GRABACION_MAXIMA_S = 8         # si el botón se queda apretado, corta igual
 
 # Configuración del botón físico
