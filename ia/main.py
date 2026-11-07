@@ -14,6 +14,7 @@ import cv2
 import numpy as np
 from ultralytics import YOLO as ModeloYOLO
 
+from ia.vista import dibujar
 from ia.embeddings import enderezar, vector
 from ia.herramientas.modelo_esquinas import esquinas_en_caja
 from ia.herramientas.ruteo import buscar_ruta_optima
@@ -73,6 +74,7 @@ class Estado:
     camino: list[int] = field(default_factory=list)
     callado: bool = False                     # True después de llegar, hasta que la persona vuelva a hablar
     ultimo_cartel: float = 0.0                # cuándo se vio por última vez un cartel con posición válida
+    ultima_vista: bytes | None = None         # última foto con lo que encontró la IA dibujado (JPEG, para /ver)
 
 
 # ---------- Datos ----------
@@ -322,7 +324,8 @@ def procesar_frame(frame: np.ndarray, estado: Estado) -> tuple[str | None, dict]
     # Elección del cartel: se descartan los cortados por el borde y los que identificar() no reconoce,
     # y de los que quedan se usa el más grande (el más cercano: solvePnP es más preciso).
     alto, ancho = frame.shape[:2]
-    enteras = [d for d in con_esquinas if not cortado_por_el_borde(d, ancho, alto)]
+    cortadas = [d for d in con_esquinas if cortado_por_el_borde(d, ancho, alto)]
+    enteras = [d for d in con_esquinas if d not in cortadas]
     enteras.sort(key=lambda d: cv2.contourArea(d.esquinas.astype(np.float32)), reverse=True)
 
     mejor, nombre, confianza = None, None, 0.0
@@ -342,7 +345,9 @@ def procesar_frame(frame: np.ndarray, estado: Estado) -> tuple[str | None, dict]
             motivo = "no reconoció el cartel"
         print(f"[frame] {motivo}")
         # sin cartel igual se decide: puede tocar pedir destino o mover la cabeza
-        return decidir([], None, 0.0, estado), {"motivo": motivo}
+        texto = decidir([], None, 0.0, estado)
+        estado.ultima_vista = dibujar(frame, todas, cortadas, None, None, motivo, texto)
+        return texto, {"motivo": motivo}
 
     cartel = GRAFO["carteles"][nombre]
     nodo = cartel["nodos"][0]      # si el cartel está en dos nodos gemelos, están en el mismo punto
