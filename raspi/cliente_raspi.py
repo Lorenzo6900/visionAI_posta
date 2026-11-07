@@ -17,6 +17,7 @@ import signal
 import subprocess
 import threading
 import time
+from urllib.parse import unquote
 
 import cv2
 import requests
@@ -104,7 +105,7 @@ def bucle_frames():
 
                     # 200 con contenido -> hay una indicación que reproducir; 204 -> nada que decir
                     if response.status_code == 200 and response.content:
-                        print("🔊 Reproduciendo guía de navegación...")
+                        print(f'🔊 Dice: "{unquote(response.headers.get("X-Texto", ""))}"')
                         reproducir_audio(response.content, "instruccion.mp3")
             except Exception as e:
                 # Cualquier error (red, cámara) pierde solo esta foto: el bucle sigue
@@ -134,7 +135,8 @@ def atender_boton():
                     response = requests.post(f"{SERVIDOR_URL}/audio", files=files, timeout=15)
 
                 if response.status_code == 200 and response.content:
-                    print("🔊 Reproduciendo respuesta de destino...")
+                    print(f'💬 Entendió: "{unquote(response.headers.get("X-Transcripcion", ""))}"')
+                    print(f'🔊 Dice: "{unquote(response.headers.get("X-Texto", ""))}"')
                     reproducir_audio(response.content, "respuesta.mp3")
                 else:
                     print(f"⚠️ Servidor respondió con código: {response.status_code}")

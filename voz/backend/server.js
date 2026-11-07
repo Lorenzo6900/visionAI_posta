@@ -84,6 +84,7 @@ app.post('/frame', upload.single('imagen'), async (req, res) => {
 
     const bufferMp3 = fs.readFileSync(mp3SalidaTemp);
     res.setHeader('Content-Type', 'audio/mpeg');
+    res.setHeader('X-Texto', encodeURIComponent(textoAudio));   // para que la raspi muestre qué dice
     return res.send(bufferMp3);
 
   } catch (error) {
@@ -160,6 +161,8 @@ app.post('/audio', upload.single('audio'), async (req, res) => {
     await generarAudioMP3(fraseRespuesta, mp3SalidaTemp);
 
     const bufferMp3 = fs.readFileSync(mp3SalidaTemp);
+    res.setHeader('X-Texto', encodeURIComponent(fraseRespuesta));
+    res.setHeader('X-Transcripcion', encodeURIComponent(textoTranscripto));   // lo que entendió el STT
     res.setHeader('Content-Type', 'audio/mpeg');
     return res.send(bufferMp3);
 
@@ -168,6 +171,7 @@ app.post('/audio', upload.single('audio'), async (req, res) => {
     // Fallback asegurado para no dejar al usuario sin respuesta hablada
     try {
       mp3SalidaTemp = path.join(TEMP, `error_${Date.now()}.mp3`);
+      res.setHeader('X-Texto', encodeURIComponent("No te entendí. ¿A dónde querés ir?"));
       await generarAudioMP3("No te entendí. ¿A dónde querés ir?", mp3SalidaTemp);
       const bufferMp3 = fs.readFileSync(mp3SalidaTemp);
       res.setHeader('Content-Type', 'audio/mpeg');
